@@ -1,4 +1,5 @@
 import json
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,6 +11,18 @@ from app.agent.providers import ProviderError
 from app.agent.state import GraphState
 from app.services.diffs import apply_diff
 from app.services.tests_runner import run_tests
+
+_CODE_FENCE_RE = re.compile(r"^```[a-zA-Z]*\n(.*)\n```\s*$", re.DOTALL)
+
+
+def _strip_code_fence(text: str) -> str:
+    """Models often wrap output in markdown fences despite "return ONLY ..." instructions.
+
+    Only touches text that actually matches a fence — a diff without one is returned
+    byte-for-byte, since git apply is sensitive to trailing newlines.
+    """
+    match = _CODE_FENCE_RE.match(text.strip())
+    return match.group(1) + "\n" if match else text
 
 
 @dataclass
@@ -63,7 +76,7 @@ def plan_node(state: GraphState, deps: NodeDeps) -> dict:
     text, tokens_in, tokens_out, provider_name = deps.providers.generate(prompt)
     cost = deps.budget.cost_of(tokens_in, tokens_out, provider_name)
     deps.budget.record(cost)
-    plan = json.loads(text)
+    plan = json.loads(_strip_code_fence(text))
     files = {
         entry["path"]: {
             "path": entry["path"],
@@ -131,6 +144,7 @@ def migrate_file_node(state: GraphState, deps: NodeDeps) -> dict:
 
     try:
         diff_text, tokens_in, tokens_out, provider_name = deps.providers.generate(prompt)
+        diff_text = _strip_code_fence(diff_text)
     except ProviderError as exc:
         file_result["status"] = "failed"
         return _advance(state, path, file_result, deps, note=f"provider error: {exc}")
