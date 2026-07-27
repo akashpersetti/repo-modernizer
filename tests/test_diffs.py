@@ -26,6 +26,19 @@ def test_make_diff_no_change_produces_empty_diff():
     assert make_diff("x = 1\n", "x = 1\n", "app.py") == ""
 
 
+def test_make_diff_applies_when_after_missing_trailing_newline(tmp_path: Path):
+    # LLM-generated file content routinely omits the final newline; make_diff must
+    # still produce a diff `git apply` accepts against a source that has one.
+    repo = tmp_path
+    (repo / "app.py").write_text("x = 1\n")
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+
+    diff = make_diff("x = 1\n", "x = 2", "app.py")  # note: no trailing newline
+    apply_diff(diff, repo)
+
+    assert (repo / "app.py").read_text() == "x = 2\n"
+
+
 def test_parse_unified_diff_basic():
     diff = _make_diff("x = 1\n", "x = 2\n")
     parsed = parse_unified_diff(diff)

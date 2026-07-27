@@ -35,7 +35,15 @@ def make_diff(before: str, after: str, path: str) -> str:
     Used instead of asking an LLM to hand-write a diff: the LLM returns the full
     new file content, and we compute the diff ourselves so context lines always
     match the real on-disk content byte-for-byte, guaranteeing `git apply` succeeds.
+
+    Normalizes a missing trailing newline on either side first — LLMs routinely
+    omit the final newline in generated content, and a before/after mismatch on
+    that alone produces a diff `git apply` rejects as corrupt.
     """
+    if before and not before.endswith("\n"):
+        before += "\n"
+    if after and not after.endswith("\n"):
+        after += "\n"
     return "".join(difflib.unified_diff(
         before.splitlines(keepends=True),
         after.splitlines(keepends=True),
