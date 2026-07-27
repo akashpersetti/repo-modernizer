@@ -51,7 +51,7 @@ def test_migrate_graph_happy_path_low_risk(tmp_path: Path):
 
     fake = FakeProviderRouter([
         json.dumps([{"path": "app.py", "rationale": "trivial change", "risk_score": 0.1}]),
-        _make_diff("x = 1\n", "x = 2\n"),
+        "x = 2\n",
     ])
     deps = NodeDeps(
         providers=fake,
@@ -79,8 +79,8 @@ def test_migrate_graph_high_risk_requires_approval(tmp_path: Path):
 
     fake = FakeProviderRouter([
         json.dumps([{"path": "app.py", "rationale": "risky change", "risk_score": 0.9}]),
-        _make_diff("x = 1\n", "x = 2\n"),
-        _make_diff("x = 1\n", "x = 2\n"),
+        "x = 2\n",
+        "x = 2\n",
     ])
     deps = NodeDeps(
         providers=fake,
@@ -103,15 +103,28 @@ def test_migrate_graph_high_risk_requires_approval(tmp_path: Path):
     assert result["files"]["app.py"]["status"] == "approved"
 
 
-def test_migrate_graph_retries_on_malformed_diff(tmp_path: Path):
+def test_migrate_graph_retries_on_apply_failure(tmp_path: Path, monkeypatch):
+    import app.agent.nodes as nodes_module
+
     repo = tmp_path / "repo"
     repo.mkdir()
     (repo / "app.py").write_text("x = 1\n")
 
+    real_apply_diff = nodes_module.apply_diff
+    calls = {"count": 0}
+
+    def flaky_apply_diff(diff_text, workspace_root):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise RuntimeError("git apply failed: simulated transient failure")
+        return real_apply_diff(diff_text, workspace_root)
+
+    monkeypatch.setattr(nodes_module, "apply_diff", flaky_apply_diff)
+
     fake = FakeProviderRouter([
         json.dumps([{"path": "app.py", "rationale": "trivial change", "risk_score": 0.1}]),
-        "this is not a valid unified diff",
-        _make_diff("x = 1\n", "x = 2\n"),
+        "x = 2\n",
+        "x = 2\n",
     ])
     deps = NodeDeps(
         providers=fake,
@@ -123,10 +136,11 @@ def test_migrate_graph_retries_on_malformed_diff(tmp_path: Path):
         estimated_cost_per_file=0.01,
     )
     graph = build_graph(deps)
-    config = {"configurable": {"thread_id": "malformed-diff"}}
+    config = {"configurable": {"thread_id": "apply-failure"}}
 
     result = graph.invoke(_initial_state(str(repo), "bump x", "true"), config=config)
 
     assert "__interrupt__" not in result
     assert result["files"]["app.py"]["status"] == "migrated"
     assert result["files"]["app.py"]["retry_count"] == 1
+    assert calls["count"] == 2

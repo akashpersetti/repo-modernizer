@@ -9,7 +9,7 @@ from langgraph.types import interrupt
 from app.agent.guardrails import validate_diff
 from app.agent.providers import ProviderError
 from app.agent.state import GraphState
-from app.services.diffs import apply_diff
+from app.services.diffs import apply_diff, make_diff
 from app.services.tests_runner import run_tests
 
 _CODE_FENCE_RE = re.compile(r"^```[a-zA-Z]*\n(.*)\n```\s*$", re.DOTALL)
@@ -37,7 +37,12 @@ class NodeDeps:
 
 
 def _is_test_file(path: Path) -> bool:
-    return "tests" in path.parts or path.stem.startswith("test_") or path.stem.endswith("_test")
+    return (
+        "tests" in path.parts
+        or path.stem.startswith("test_")
+        or path.stem.endswith("_test")
+        or path.stem == "conftest"
+    )
 
 
 def ingest_node(state: GraphState, deps: NodeDeps) -> dict:
@@ -138,16 +143,19 @@ def migrate_file_node(state: GraphState, deps: NodeDeps) -> dict:
     error_context = f"\nPrevious attempt failed: {file_result['last_error']}" if file_result["last_error"] else ""
     prompt = (
         f"Goal: {state['goal']}\nFile: {path}\n\n{source}\n{error_context}\n\n"
-        "Return ONLY a unified diff (git diff format) that migrates this file toward the goal. "
-        "Do not touch any other file. Do not delete the file."
+        "Return ONLY the complete new content of this file after migrating it toward the goal. "
+        "Do not include any explanation, markdown fences, or diff syntax — just the raw file content, "
+        "nothing else. Keep the file non-empty."
     )
 
     try:
-        diff_text, tokens_in, tokens_out, provider_name = deps.providers.generate(prompt)
-        diff_text = _strip_code_fence(diff_text)
+        new_content, tokens_in, tokens_out, provider_name = deps.providers.generate(prompt)
+        new_content = _strip_code_fence(new_content)
     except ProviderError as exc:
         file_result["status"] = "failed"
         return _advance(state, path, file_result, deps, note=f"provider error: {exc}")
+
+    diff_text = make_diff(source, new_content, path)
 
     cost = deps.budget.cost_of(tokens_in, tokens_out, provider_name)
     deps.budget.record(cost)

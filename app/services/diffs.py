@@ -1,3 +1,4 @@
+import difflib
 import re
 import subprocess
 from dataclasses import dataclass
@@ -26,6 +27,21 @@ def parse_unified_diff(diff_text: str) -> ParsedDiff:
         and not line.startswith("---")
     )
     return ParsedDiff(target_paths=target_paths, deletes=deletes, lines_changed=lines_changed)
+
+
+def make_diff(before: str, after: str, path: str) -> str:
+    """Build a unified diff from known-good before/after text for one file.
+
+    Used instead of asking an LLM to hand-write a diff: the LLM returns the full
+    new file content, and we compute the diff ourselves so context lines always
+    match the real on-disk content byte-for-byte, guaranteeing `git apply` succeeds.
+    """
+    return "".join(difflib.unified_diff(
+        before.splitlines(keepends=True),
+        after.splitlines(keepends=True),
+        fromfile=f"a/{path}",
+        tofile=f"b/{path}",
+    ))
 
 
 def apply_diff(diff_text: str, workspace_root: Path) -> None:

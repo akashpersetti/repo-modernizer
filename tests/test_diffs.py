@@ -4,17 +4,26 @@ from pathlib import Path
 
 import pytest
 
-from app.services.diffs import apply_diff, parse_unified_diff
+from app.services.diffs import apply_diff, make_diff, parse_unified_diff
 
 
 def _make_diff(before: str, after: str, path: str = "app.py") -> str:
-    import difflib
-    return "".join(difflib.unified_diff(
-        before.splitlines(keepends=True),
-        after.splitlines(keepends=True),
-        fromfile=f"a/{path}",
-        tofile=f"b/{path}",
-    ))
+    return make_diff(before, after, path)
+
+
+def test_make_diff_produces_git_apply_compatible_output(tmp_path: Path):
+    repo = tmp_path
+    (repo / "app.py").write_text("x = 1\n")
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+
+    diff = make_diff("x = 1\n", "x = 2\n", "app.py")
+    apply_diff(diff, repo)
+
+    assert (repo / "app.py").read_text() == "x = 2\n"
+
+
+def test_make_diff_no_change_produces_empty_diff():
+    assert make_diff("x = 1\n", "x = 1\n", "app.py") == ""
 
 
 def test_parse_unified_diff_basic():
