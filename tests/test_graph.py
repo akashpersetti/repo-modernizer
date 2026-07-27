@@ -18,7 +18,7 @@ class FakeProviderRouter:
     def generate(self, prompt: str):
         text = self.responses[self.calls]
         self.calls += 1
-        return text, 100, 50, "fake-provider"
+        return text, 100, 50, "bedrock-primary"
 
 
 def _make_diff(before: str, after: str, path: str = "app.py") -> str:
