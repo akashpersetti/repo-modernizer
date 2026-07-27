@@ -101,3 +101,32 @@ def test_migrate_graph_high_risk_requires_approval(tmp_path: Path):
 
     assert "__interrupt__" not in result
     assert result["files"]["app.py"]["status"] == "approved"
+
+
+def test_migrate_graph_retries_on_malformed_diff(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "app.py").write_text("x = 1\n")
+
+    fake = FakeProviderRouter([
+        json.dumps([{"path": "app.py", "rationale": "trivial change", "risk_score": 0.1}]),
+        "this is not a valid unified diff",
+        _make_diff("x = 1\n", "x = 2\n"),
+    ])
+    deps = NodeDeps(
+        providers=fake,
+        budget=BudgetTracker(cap_usd=10.0),
+        forbidden_paths=[],
+        max_diff_lines=400,
+        risk_threshold=0.6,
+        max_retries=2,
+        estimated_cost_per_file=0.01,
+    )
+    graph = build_graph(deps)
+    config = {"configurable": {"thread_id": "malformed-diff"}}
+
+    result = graph.invoke(_initial_state(str(repo), "bump x", "true"), config=config)
+
+    assert "__interrupt__" not in result
+    assert result["files"]["app.py"]["status"] == "migrated"
+    assert result["files"]["app.py"]["retry_count"] == 1

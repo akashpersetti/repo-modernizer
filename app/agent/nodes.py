@@ -165,7 +165,11 @@ def migrate_file_node(state: GraphState, deps: NodeDeps) -> dict:
             file_result["status"] = "rejected"
             return _advance(state, path, file_result, deps, note=decision.get("note", "rejected by reviewer"))
 
-    apply_diff(diff_text, workspace)
+    try:
+        apply_diff(diff_text, workspace)
+    except RuntimeError as exc:
+        return _retry_or_fail(state, file_result, path, f"diff apply failed: {exc}", deps)
+
     result = run_tests(workspace, state["test_command"])
     if not result.passed:
         return _retry_or_fail(state, file_result, path, f"tests failed: {result.output[-500:]}", deps)
