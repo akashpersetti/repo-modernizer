@@ -30,7 +30,7 @@
 **Interfaces:**
 - Produces: `Settings.github_app_token: str`, `Settings.github_default_base_branch: str`, `Settings.ddb_table_checkpoints: str`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # tests/test_config.py — add these
@@ -42,12 +42,12 @@ def test_settings_has_github_and_checkpoint_defaults(monkeypatch):
     assert settings.github_app_token == ""
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.venv/bin/python -m pytest tests/test_config.py -v`
 Expected: FAIL with `AttributeError` — fields don't exist yet.
 
-- [ ] **Step 3: Update pyproject.toml, config.py, .env.example; write the table-creation script**
+- [x] **Step 3: Update pyproject.toml, config.py, .env.example; write the table-creation script**
 
 ```toml
 # pyproject.toml — dependencies section becomes:
@@ -114,12 +114,12 @@ Verify: `aws dynamodb describe-table --table-name repomod-checkpoints --query 'T
 
 Run `uv sync` after the pyproject.toml change to install the new/moved dependencies.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `.venv/bin/python -m pytest tests/test_config.py -v`
 Expected: PASS (all tests, including the new one)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pyproject.toml app/config.py .env.example scripts/create_checkpoints_table.sh uv.lock
