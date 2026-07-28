@@ -251,7 +251,7 @@ git commit -m "feat: injectable checkpointer in build_graph, allow-empty baselin
 
 **Prerequisite:** Task 1's `repomod-checkpoints` table must already exist and be `ACTIVE` — these tests hit it for real (per the earlier decision to test against real AWS, not LocalStack).
 
-- [ ] **Step 1: Inspect the actual installed LangGraph checkpointer contract**
+- [x] **Step 1: Inspect the actual installed LangGraph checkpointer contract**
 
 Run:
 ```bash
@@ -265,7 +265,7 @@ for name in ['put', 'put_writes', 'get_tuple', 'list', '__init__']:
 
 The implementation below is written against the standard `put(config, checkpoint, metadata, new_versions)` / `put_writes(config, writes, task_id, task_path="")` / `get_tuple(config)` / `list(config, *, filter=None, before=None, limit=None)` contract. If this command's output shows different parameter names or order for the installed version, adjust the implementation in Step 3 to match — Python will raise `TypeError: Can't instantiate abstract class DynamoDBCheckpointer with abstract method(s) ...` immediately and unambiguously if a required method is missing or misnamed, so a mismatch surfaces at the very first test run, not silently.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 ```python
 # tests/test_checkpointer.py
@@ -331,12 +331,12 @@ def test_put_writes_surfaces_as_pending_writes():
     assert result.pending_writes == [("task-1", "files", {"a.py": "pending"})]
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 Run: `.venv/bin/python -m pytest tests/test_checkpointer.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named 'app.agent.checkpointer'`
 
-- [ ] **Step 4: Write the implementation**
+- [x] **Step 4: Write the implementation**
 
 ```python
 # app/agent/checkpointer.py
@@ -439,12 +439,12 @@ class DynamoDBCheckpointer(BaseCheckpointSaver):
             yield self._tuple_from_item(thread_id, item)
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `.venv/bin/python -m pytest tests/test_checkpointer.py -v`
 Expected: PASS (4 tests). If a method signature doesn't match the installed LangGraph version (per Step 1's inspection), adjust parameter names to match and re-run — do not change the external behavior the tests assert.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add app/agent/checkpointer.py tests/test_checkpointer.py
