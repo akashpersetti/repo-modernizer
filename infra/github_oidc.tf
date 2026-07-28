@@ -24,7 +24,11 @@ data "aws_iam_policy_document" "github_actions_assume" {
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_org}/${var.github_repo}:*"]
+      # GitHub's sub claim now embeds numeric org/repo database IDs
+      # (repo:OWNER@ORG_ID/REPO@REPO_ID:...), not the classic
+      # repo:OWNER/REPO:* format -- confirmed via CloudTrail's
+      # principalId on a rejected AssumeRoleWithWebIdentity call.
+      values = ["repo:${var.github_org}@*/${var.github_repo}@*:*"]
     }
   }
 }
