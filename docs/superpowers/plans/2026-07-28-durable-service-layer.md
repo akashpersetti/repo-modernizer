@@ -882,7 +882,7 @@ git commit -m "feat: TaskRunner — background-thread execution, status derivati
 - Consumes: `app.worker.runner.TaskRunner` (Task 5) via dependency injection (`configure_runner`).
 - Produces: FastAPI `app` instance; routes matching spec §6 (`POST /tasks`, `GET /tasks/{id}`, `POST /tasks/{id}/approve`, `POST /tasks/{id}/resume`, `GET /health`).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 # tests/test_routes.py
@@ -969,12 +969,12 @@ def test_resume_task():
     assert fake.resumed == ["fake-task-id"]
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/bin/python -m pytest tests/test_routes.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named 'app.api'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```python
 # app/api/__init__.py
@@ -1115,12 +1115,12 @@ def _startup() -> None:
     configure_runner(runner)
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `.venv/bin/python -m pytest tests/test_routes.py -v`
 Expected: PASS (5 tests). Note: importing `app.main` triggers FastAPI's app construction but not `_startup()` (that only runs under a real ASGI server or `TestClient` used as a context manager) — `configure_runner(fake)` in each test overrides whatever `_runner` state exists, so these tests never touch real AWS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/api/__init__.py app/api/routes_health.py app/api/routes_tasks.py app/main.py tests/test_routes.py
