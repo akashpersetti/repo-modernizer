@@ -609,7 +609,7 @@ git commit -m "feat: GitHub clone/branch/commit/push/PR service"
 - Consumes: `app.agent.graph.build_graph` (Task 2), `app.agent.checkpointer.DynamoDBCheckpointer` (Task 3), `app.services.github` (Task 4).
 - Produces: `RepoContext` dataclass; `TaskRunner(deps_factory, checkpointer, github_token, workspace_root=Path("runs"))` with methods `start(repo_url, goal, test_command, base_branch="main") -> str`, `get_status(task_id: str) -> dict`, `approve(task_id, file, decision, note="") -> None`, `resume(task_id) -> None`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 # tests/test_runner.py
@@ -729,12 +729,12 @@ def _make_bare_remote_with_file(bare_path: Path, filename: str, content: str) ->
     subprocess.run(["git", "push", "-q", "origin", "HEAD:main"], cwd=seed, check=True)
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/bin/python -m pytest tests/test_runner.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named 'app.worker'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```python
 # app/worker/__init__.py
@@ -855,12 +855,12 @@ class TaskRunner:
         thread.start()
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `.venv/bin/python -m pytest tests/test_runner.py -v`
 Expected: PASS (2 tests). These hit real Bedrock (via `FakeProviderRouter`, no — they use the fake, so no real Bedrock calls; they're fully offline aside from local git operations).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/worker/__init__.py app/worker/runner.py tests/test_runner.py
