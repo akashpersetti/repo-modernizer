@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     forbidden_paths: str = ".github/,migrations/,*.lock"
     max_diff_lines: int = 400
     estimated_cost_per_file_usd: float = 0.05
+    github_app_token: str = ""
+    github_default_base_branch: str = "main"
+    ddb_table_checkpoints: str = "repomod-checkpoints"
 
     def forbidden_paths_list(self) -> list[str]:
         return [p.strip() for p in self.forbidden_paths.split(",") if p.strip()]
