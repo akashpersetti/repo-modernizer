@@ -59,6 +59,13 @@ data "aws_iam_policy_document" "github_deploy_perms" {
     resources = ["arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/repomod-tf-lock"]
   }
   statement {
+    # test_checkpointer.py round-trips real rows through the live checkpoints
+    # table (no mocking) -- the test job needs the same access the API Lambda
+    # has to run in CI.
+    actions   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query"]
+    resources = ["arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/repomod-checkpoints"]
+  }
+  statement {
     actions   = ["iam:PassRole"]
     resources = ["*"]
   }

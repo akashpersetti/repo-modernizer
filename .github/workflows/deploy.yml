@@ -23,6 +23,14 @@ jobs:
       AWS_DEFAULT_REGION: us-east-1
     steps:
       - uses: actions/checkout@v4
+      # test_checkpointer.py isn't a unit test -- it round-trips real rows
+      # through the live repomod-checkpoints DynamoDB table, no mocking.
+      # Only ever passed locally because of ambient AWS creds; needs the
+      # same OIDC role plan/deploy use to do the same in CI.
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
       - uses: astral-sh/setup-uv@v3
       - run: uv sync
       - run: .venv/bin/python -m pytest -q
