@@ -5,7 +5,10 @@ import httpx
 
 
 def _with_token(url: str, token: str) -> str:
-    if token and url.startswith("https://"):
+    # "@" means credentials are already embedded (e.g. clone_repo already did this and
+    # `git remote get-url` echoes it back) -- re-adding here would double-prefix the URL
+    # into an invalid one (https://x-access-token:T@x-access-token:T@github.com/...).
+    if token and url.startswith("https://") and "@" not in url:
         return url.replace("https://", f"https://x-access-token:{token}@")
     return url
 

@@ -1,7 +1,7 @@
 import subprocess
 from pathlib import Path
 
-from app.services.github import clone_repo, commit_all, create_branch
+from app.services.github import _with_token, clone_repo, commit_all, create_branch
 
 
 def _init_bare_remote(tmp_path: Path) -> Path:
@@ -20,6 +20,18 @@ def _init_bare_remote(tmp_path: Path) -> Path:
     subprocess.run(["git", "push", "-q", "origin", "HEAD:main"], cwd=seed, check=True)
     subprocess.run(["git", "symbolic-ref", "HEAD", "refs/heads/main"], cwd=bare, check=True)
     return bare
+
+
+def test_with_token_does_not_double_prefix_an_already_authed_url():
+    # push_branch reads the remote URL back via `git remote get-url`, which echoes
+    # whatever clone_repo already embedded -- re-running _with_token on that must
+    # be a no-op, not a second credential prefix.
+    already_authed = "https://x-access-token:abc123@github.com/x/y"
+    assert _with_token(already_authed, "abc123") == already_authed
+
+
+def test_with_token_adds_credentials_to_a_bare_https_url():
+    assert _with_token("https://github.com/x/y", "abc123") == "https://x-access-token:abc123@github.com/x/y"
 
 
 def test_clone_repo_clones_local_bare_remote(tmp_path: Path):
