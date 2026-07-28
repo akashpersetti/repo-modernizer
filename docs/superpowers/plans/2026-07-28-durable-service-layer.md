@@ -1416,7 +1416,7 @@ curl -s -X POST localhost:8000/tasks/<task_id>/resume | jq
 It continues from the last DynamoDB checkpoint rather than restarting. See `tests/test_crash_recovery.py` for the automated version of this proof.
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/test_github_live.py README.md
