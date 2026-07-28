@@ -1466,7 +1466,7 @@ git commit -m "feat: \$5 alert and \$10 ceiling AWS Budgets tripwires"
 
 **Files:** none — this task is pure verification, no new files.
 
-- [ ] **Step 1: Run a real migration through the deployed API**
+- [x] **Step 1: Run a real migration through the deployed API**
 
 ```bash
 API_URL=$(cd infra && terraform output -raw api_url)
@@ -1481,7 +1481,7 @@ TASK_ID=$(jq -r .task_id /tmp/create_response.json)
 echo "task_id=$TASK_ID"
 ```
 
-- [ ] **Step 2: Poll status, approve if needed**
+- [x] **Step 2: Poll status, approve if needed**
 
 ```bash
 until curl -s "$API_URL/tasks/$TASK_ID" | tee /tmp/status.json | jq -e '.done or .awaiting_approval' > /dev/null; do
@@ -1500,7 +1500,7 @@ done
 cat /tmp/status.json
 ```
 
-- [ ] **Step 3: Check CloudWatch logs if anything looks wrong**
+- [x] **Step 3: Check CloudWatch logs if anything looks wrong**
 
 ```bash
 aws logs tail /ecs/repomod-worker --since 10m
@@ -1508,7 +1508,7 @@ aws logs tail /aws/lambda/repomod-consumer --since 10m
 aws logs tail /aws/lambda/repomod-api --since 10m
 ```
 
-- [ ] **Step 4: Verify the real PR**
+- [x] **Step 4: Verify the real PR**
 
 Run: `gh pr list --repo akashpersetti/repomodernizer-demo-target --state open` — a new PR should be present, opened by this deployed-stack run (distinct from sub-project 2's PRs, which came from the local path).
 
