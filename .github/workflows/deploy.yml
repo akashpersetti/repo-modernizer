@@ -13,6 +13,13 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      # boto3 resolves region at client-construction time (module import for
+      # consumer_handler.py/checkpointer.py), before tests get a chance to
+      # mock anything -- needs a region even though these are unit tests
+      # with no real AWS calls. Locally this comes from ~/.aws/config; the
+      # runner has none.
+      AWS_REGION: us-east-1
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
