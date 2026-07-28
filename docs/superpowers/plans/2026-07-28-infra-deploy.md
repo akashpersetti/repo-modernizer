@@ -16,6 +16,7 @@
 - CloudWatch log group `retention_in_days = 7` everywhere logs are produced (set inline on each log group resource — no separate `logs.tf`, there's no shared logic to centralize).
 - `GITHUB_APP_TOKEN` lives in SSM Parameter Store (SecureString), referenced via the ECS task definition's `secrets` block — never a plain Terraform variable baked into `environment`, matching spec §5's "inject from SSM/Secrets Manager, not a file."
 - AWS account: `914697327092`, region `us-east-1`. GitHub repo for OIDC trust: `akashpersetti/repo-modernizer` (this project's own repo, distinct from the `repomodernizer-demo-target` repo being migrated).
+- Every `docker buildx build ... --push` MUST include `--provenance=false --sbom=false`. Without them, modern buildx attaches a provenance/SBOM attestation by default, turning a single-platform image into an OCI image *index* — Lambda's `CreateFunction`/`UpdateFunctionCode` API rejects that outright with "image manifest, config or layer media type ... is not supported," even though the image itself is perfectly valid amd64. Found live in Task 7 (see the `aws ecr batch-get-image ... imageManifest` verification below, added to confirm `mediaType` is `application/vnd.docker.distribution.manifest.v2+json`, not `application/vnd.oci.image.index.v1+json`).
 
 ---
 
@@ -31,7 +32,7 @@
 **Interfaces:**
 - Produces: an S3 bucket + DynamoDB lock table for Terraform's own state, and the `infra/` directory's provider/variable scaffolding every later task builds on.
 
-- [ ] **Step 1: Write and run the backend bootstrap script**
+- [x] **Step 1: Write and run the backend bootstrap script**
 
 ```bash
 #!/usr/bin/env bash
@@ -62,7 +63,7 @@ echo "Lock table: repomod-tf-lock"
 Run: `chmod +x scripts/bootstrap_tf_backend.sh && ./scripts/bootstrap_tf_backend.sh`
 Verify: `aws s3api head-bucket --bucket repomodernizer-tfstate-914697327092` exits 0; `aws dynamodb describe-table --table-name repomod-tf-lock --query 'Table.TableStatus'` prints `"ACTIVE"`.
 
-- [ ] **Step 2: Write versions.tf, backend.tf, variables.tf**
+- [x] **Step 2: Write versions.tf, backend.tf, variables.tf**
 
 ```hcl
 # infra/versions.tf
@@ -159,12 +160,12 @@ infra/.terraform.lock.hcl
 infra/consumer_handler.zip
 ```
 
-- [ ] **Step 3: Initialize Terraform**
+- [x] **Step 3: Initialize Terraform**
 
 Run: `cd infra && terraform init`
 Verify: output ends with `Terraform has been successfully initialized!` and shows the S3 backend configured (not local state).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add scripts/bootstrap_tf_backend.sh infra/versions.tf infra/backend.tf infra/variables.tf .gitignore
@@ -182,7 +183,7 @@ git commit -m "feat: bootstrap Terraform S3 backend, provider and variable scaff
 **Interfaces:**
 - Produces: `aws_vpc.main`, `aws_subnet.public[*]`, `aws_security_group.worker`, `aws_vpc_endpoint.s3`/`.dynamodb`, `aws_efs_file_system.workspace`, `aws_efs_access_point.workspace`.
 
-- [ ] **Step 1: Write vpc.tf (spec §9b, verbatim — already reviewed and correct)**
+- [x] **Step 1: Write vpc.tf (spec §9b, verbatim — already reviewed and correct)**
 
 ```hcl
 # infra/vpc.tf
@@ -259,7 +260,7 @@ resource "aws_security_group_rule" "worker_nfs" {
 }
 ```
 
-- [ ] **Step 2: Write efs.tf**
+- [x] **Step 2: Write efs.tf**
 
 ```hcl
 # infra/efs.tf
@@ -293,18 +294,18 @@ resource "aws_efs_access_point" "workspace" {
 }
 ```
 
-- [ ] **Step 3: Plan and apply**
+- [x] **Step 3: Plan and apply**
 
 Run: `cd infra && terraform plan -var="budget_alert_email=<your-email>"` — review the plan (should show only VPC/subnet/IGW/route/endpoints/SG/EFS resources, nothing else yet).
 Run: `terraform apply -var="budget_alert_email=<your-email>"`
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `aws ec2 describe-vpcs --filters "Name=tag:project,Values=repomodernizer" --query 'Vpcs[0].State'` → `"available"`.
 Run: `aws efs describe-file-systems --query "FileSystems[?Tags[?Key=='project']].LifeCycleState" --output text` → `available`.
 Run: `aws efs describe-mount-targets --file-system-id <id-from-above> --query 'MountTargets[*].LifeCycleState'` → both `["available", "available"]` (may take a minute after apply).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add infra/vpc.tf infra/efs.tf
@@ -323,7 +324,7 @@ git commit -m "feat: NAT-free VPC with gateway endpoints, EFS for cross-task wor
 **Interfaces:**
 - Produces: `aws_dynamodb_table.checkpoints`, `aws_sqs_queue.tasks`, `aws_ecr_repository.api`/`.worker`.
 
-- [ ] **Step 1: Write the three files**
+- [x] **Step 1: Write the three files**
 
 ```hcl
 # infra/dynamodb.tf
@@ -396,18 +397,18 @@ resource "aws_ecr_lifecycle_policy" "worker" {
 }
 ```
 
-- [ ] **Step 2: Import the existing checkpoints table, then plan and apply**
+- [x] **Step 2: Import the existing checkpoints table, then plan and apply**
 
 Run: `cd infra && terraform import aws_dynamodb_table.checkpoints repomod-checkpoints`
 Run: `terraform plan -var="budget_alert_email=<your-email>"` — should show **no changes** for `aws_dynamodb_table.checkpoints` (schema matches what's already live) and **create** for the SQS queue and two ECR repos.
 Run: `terraform apply -var="budget_alert_email=<your-email>"`
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `aws sqs get-queue-attributes --queue-url $(aws sqs get-queue-url --queue-name repomod-tasks --query QueueUrl --output text) --attribute-names VisibilityTimeout --query 'Attributes.VisibilityTimeout'` → `"900"`.
 Run: `aws ecr describe-repositories --repository-names repomod-api repomod-worker --query 'repositories[*].repositoryName'` → both present.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add infra/dynamodb.tf infra/sqs.tf infra/ecr.tf
@@ -426,7 +427,7 @@ git commit -m "feat: DynamoDB checkpoints table (imported), SQS task queue, ECR 
 
 **Note:** `aws_iam_policy_document.consumer_lambda_perms`'s `ecs:RunTask` resource is written as an interpolated ARN string (`arn:aws:ecs:...task-definition/repomod-worker:*`), not a direct reference to `aws_ecs_task_definition.worker.arn` — that resource is declared in Task 7, which comes later. Using the interpolated string here avoids a forward-reference across tasks; the ARN pattern matches the task definition family name we've already fixed (`repomod-worker`), so it resolves correctly once that resource exists.
 
-- [ ] **Step 1: Write iam.tf**
+- [x] **Step 1: Write iam.tf**
 
 ```hcl
 # infra/iam.tf
@@ -562,16 +563,16 @@ resource "aws_iam_role_policy" "ecs_task_perms" {
 }
 ```
 
-- [ ] **Step 2: Plan and apply**
+- [x] **Step 2: Plan and apply**
 
 Run: `cd infra && terraform plan -var="budget_alert_email=<your-email>"` — should show only the new IAM roles/policies/attachments.
 Run: `terraform apply -var="budget_alert_email=<your-email>"`
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `aws iam get-role --role-name repomod-api-lambda --query 'Role.RoleName'` → `"repomod-api-lambda"`. Repeat for `repomod-consumer-lambda`, `repomod-ecs-task-execution`, `repomod-ecs-task`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add infra/iam.tf
@@ -599,7 +600,7 @@ git commit -m "feat: IAM roles for API/consumer Lambdas and ECS task execution/r
 - Modifies: `GraphState` gains `repo_url: str`, `branch: str`, `base_branch: str`.
 - Produces: `app.worker.entrypoint.run() -> None` (reads `ACTION`/`TASK_ID`/etc. from `os.environ`); `app.worker.consumer_handler.handler(event, context) -> dict`; `app.lambda_handler.handler` (Mangum ASGI adapter).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 # tests/test_state.py  (new, small — pins the GraphState field addition)
@@ -747,12 +748,12 @@ def test_handler_calls_run_task_per_message(mock_ecs, monkeypatch):
     assert {"name": "TASK_ID", "value": "abc123"} in env_overrides
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/bin/python -m pytest tests/test_state.py tests/test_entrypoint.py tests/test_consumer_handler.py -v`
 Expected: FAIL — `app.worker.entrypoint`/`app.worker.consumer_handler` don't exist yet; `GraphState` doesn't have the new fields (TypedDict fields aren't runtime-checked, but the test itself constructs a dict literal, so it'll only fail once `entrypoint.py` actually reads `state["repo_url"]` and similar — the real signal here is the `ModuleNotFoundError` for the two new modules).
 
-- [ ] **Step 3: Update state.py, write entrypoint.py, consumer_handler.py, lambda_handler.py; rewrite routes_tasks.py; delete runner.py**
+- [x] **Step 3: Update state.py, write entrypoint.py, consumer_handler.py, lambda_handler.py; rewrite routes_tasks.py; delete runner.py**
 
 ```python
 # app/agent/state.py — GraphState gains three fields
@@ -1049,7 +1050,7 @@ Delete `app/worker/runner.py` and `tests/test_runner.py` (superseded).
 
 Add to `pyproject.toml`'s `dependencies`: `"mangum>=0.17"`. Run `uv sync`.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `.venv/bin/python -m pytest tests/test_state.py tests/test_entrypoint.py tests/test_consumer_handler.py -v`
 Expected: PASS (3 tests, including the EFS-motivating "two separate calls sharing only a checkpointer + filesystem path" scenario).
@@ -1057,7 +1058,7 @@ Expected: PASS (3 tests, including the EFS-motivating "two separate calls sharin
 Run: `.venv/bin/python -m pytest -q` (full suite — `test_routes.py` needs updating for the new `configure()`/enqueue-based contract; adjust its fakes to a fake SQS client with a `send_message` method instead of a fake `TaskRunner`, following the same pattern as `test_entrypoint.py`'s and sub-project 2's route tests).
 Expected: PASS, full suite green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/agent/state.py app/worker/consumer_handler.py app/worker/entrypoint.py app/lambda_handler.py \
@@ -1078,7 +1079,7 @@ git commit -m "feat: stateless worker entrypoint + enqueue-only API routes for t
 **Interfaces:**
 - Produces: two amd64 container images, pushed to the ECR repos from Task 3.
 
-- [ ] **Step 1: Write the Dockerfiles**
+- [x] **Step 1: Write the Dockerfiles**
 
 ```dockerfile
 # Dockerfile.api
@@ -1112,24 +1113,25 @@ COPY app ./app
 ENTRYPOINT ["python", "-m", "app.worker.entrypoint"]
 ```
 
-- [ ] **Step 2: Build both, amd64, and push to ECR**
+- [x] **Step 2: Build both, amd64, and push to ECR**
 
 ```bash
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 REGION=us-east-1
 aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
 
-docker buildx build --platform linux/amd64 -f Dockerfile.api -t "${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/repomod-api:initial" --push .
-docker buildx build --platform linux/amd64 -f Dockerfile.worker -t "${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/repomod-worker:initial" --push .
+docker buildx build --platform linux/amd64 --provenance=false --sbom=false -f Dockerfile.api -t "${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/repomod-api:initial" --push .
+docker buildx build --platform linux/amd64 --provenance=false --sbom=false -f Dockerfile.worker -t "${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/repomod-worker:initial" --push .
 ```
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `aws ecr describe-images --repository-name repomod-api --query 'imageDetails[*].imageTags'` → shows `["initial"]`.
 Run: `aws ecr describe-images --repository-name repomod-worker --query 'imageDetails[*].imageTags'` → shows `["initial"]`.
 Run: `docker inspect "${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/repomod-api:initial" --format '{{.Architecture}}'` → `amd64` (confirms the amd64 discipline actually held, not just the flag being passed).
+Run: `aws ecr batch-get-image --repository-name repomod-api --image-ids imageTag=initial --query 'images[0].imageManifest' --output text | python3 -c "import json,sys; print(json.load(sys.stdin).get('mediaType'))"` → `application/vnd.docker.distribution.manifest.v2+json`, **not** `application/vnd.oci.image.index.v1+json`. If you see the OCI index type, Task 7's Lambda creation will fail — re-run the build with `--provenance=false --sbom=false` (already in the command above) before proceeding.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Dockerfile.api Dockerfile.worker
@@ -1147,14 +1149,14 @@ git commit -m "feat: amd64 container images for API Lambda and Fargate worker"
 **Interfaces:**
 - Produces: `aws_lambda_function.api`/`.consumer`, `aws_lambda_event_source_mapping.consumer`, `aws_ecs_cluster.main`, `aws_ecs_task_definition.worker`.
 
-- [ ] **Step 1: Put the GitHub token in SSM (one-off, not managed by Terraform)**
+- [x] **Step 1: Put the GitHub token in SSM (one-off, not managed by Terraform)**
 
 ```bash
 aws ssm put-parameter --name /repomodernizer/github_app_token --type SecureString --value "$(gh auth token)" --overwrite
 ```
 Verify: `aws ssm get-parameter --name /repomodernizer/github_app_token --with-decryption --query 'Parameter.Name'` → the name back (confirms it's readable with your creds; the ECS task execution role's read access was granted in Task 4).
 
-- [ ] **Step 2: Write fargate.tf**
+- [x] **Step 2: Write fargate.tf**
 
 ```hcl
 # infra/fargate.tf
@@ -1225,7 +1227,7 @@ resource "aws_ecs_task_definition" "worker" {
 }
 ```
 
-- [ ] **Step 3: Write lambda.tf**
+- [x] **Step 3: Write lambda.tf**
 
 ```hcl
 # infra/lambda.tf
@@ -1294,19 +1296,19 @@ resource "aws_lambda_event_source_mapping" "consumer" {
 }
 ```
 
-- [ ] **Step 4: Plan and apply**
+- [x] **Step 4: Plan and apply**
 
 Run: `cd infra && terraform plan -var="budget_alert_email=<your-email>"` — review: two Lambda functions, one ECS cluster, one task definition, one event source mapping, two log groups.
 Run: `terraform apply -var="budget_alert_email=<your-email>"`
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 Run: `aws lambda get-function --function-name repomod-api --query 'Configuration.State'` → `"Active"`.
 Run: `aws lambda get-function --function-name repomod-consumer --query 'Configuration.State'` → `"Active"`.
 Run: `aws ecs describe-task-definition --task-definition repomod-worker --query 'taskDefinition.status'` → `"ACTIVE"`.
 Run: `aws lambda get-event-source-mapping --uuid $(aws lambda list-event-source-mappings --function-name repomod-consumer --query 'EventSourceMappings[0].UUID' --output text) --query State` → `"Enabled"`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add infra/fargate.tf infra/lambda.tf
@@ -1662,9 +1664,9 @@ jobs:
       - uses: aws-actions/amazon-ecr-login@v2
         id: ecr
       - run: |
-          docker buildx build --platform linux/amd64 -f Dockerfile.api \
+          docker buildx build --platform linux/amd64 --provenance=false --sbom=false -f Dockerfile.api \
             -t ${{ steps.ecr.outputs.registry }}/repomod-api:${{ github.sha }} --push .
-          docker buildx build --platform linux/amd64 -f Dockerfile.worker \
+          docker buildx build --platform linux/amd64 --provenance=false --sbom=false -f Dockerfile.worker \
             -t ${{ steps.ecr.outputs.registry }}/repomod-worker:${{ github.sha }} --push .
       - uses: hashicorp/setup-terraform@v3
       - run: terraform init
