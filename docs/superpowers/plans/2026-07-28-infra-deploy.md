@@ -1525,7 +1525,7 @@ Run: `gh pr list --repo akashpersetti/repomodernizer-demo-target --state open` â
 **Interfaces:**
 - Produces: `aws_iam_openid_connect_provider.github`, `aws_iam_role.github_deploy`, output `github_deploy_role_arn`.
 
-- [ ] **Step 1: Write github_oidc.tf**
+- [x] **Step 1: Write github_oidc.tf**
 
 ```hcl
 # infra/github_oidc.tf
@@ -1605,13 +1605,13 @@ output "github_deploy_role_arn" {
 }
 ```
 
-- [ ] **Step 2: Apply, then set the repo secret**
+- [x] **Step 2: Apply, then set the repo secret**
 
 Run: `cd infra && terraform apply -var="budget_alert_email=<your-email>"`
 Run: `gh secret set AWS_DEPLOY_ROLE_ARN --repo akashpersetti/repo-modernizer --body "$(terraform output -raw github_deploy_role_arn)"`
 Run: `gh secret set BUDGET_ALERT_EMAIL --repo akashpersetti/repo-modernizer --body "<your-email>"`
 
-- [ ] **Step 3: Write the workflow**
+- [x] **Step 3: Write the workflow**
 
 ```yaml
 # .github/workflows/deploy.yml
@@ -1679,11 +1679,11 @@ jobs:
         working-directory: infra
 ```
 
-- [ ] **Step 4: Verify with a real merge**
+- [x] **Step 4: Verify with a real merge**
 
 Commit this task, push a branch, open a real PR against `main` on `akashpersetti/repo-modernizer`, confirm the `test` and `plan` jobs run and pass in the Actions tab, then merge and confirm the `deploy` job runs and succeeds â€” new image tags pushed, `terraform apply` completes, `curl $API_URL/health` still returns `{"status":"ok"}` afterward.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add infra/github_oidc.tf .github/workflows/deploy.yml
