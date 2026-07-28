@@ -1,0 +1,79 @@
+# .github/workflows/deploy.yml
+name: deploy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      # boto3 resolves region at client-construction time (module import for
+      # consumer_handler.py/checkpointer.py), before tests get a chance to
+      # mock anything -- needs a region even though these are unit tests
+      # with no real AWS calls. Locally this comes from ~/.aws/config; the
+      # runner has none. This botocore version only honors AWS_DEFAULT_REGION,
+      # not AWS_REGION -- confirmed by reproducing locally with each in isolation.
+      AWS_DEFAULT_REGION: us-east-1
+    steps:
+      - uses: actions/checkout@v4
+      # test_checkpointer.py isn't a unit test -- it round-trips real rows
+      # through the live repomod-checkpoints DynamoDB table, no mocking.
+      # Only ever passed locally because of ambient AWS creds; needs the
+      # same OIDC role plan/deploy use to do the same in CI.
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync
+      - run: .venv/bin/python -m pytest -q
+
+  plan:
+    needs: test
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform init
+        working-directory: infra
+      - run: terraform plan -var="budget_alert_email=${{ secrets.BUDGET_ALERT_EMAIL }}"
+        working-directory: infra
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr
+      - run: |
+          docker buildx build --platform linux/amd64 --provenance=false --sbom=false -f Dockerfile.api \
+            -t ${{ steps.ecr.outputs.registry }}/repomod-api:${{ github.sha }} --push .
+          docker buildx build --platform linux/amd64 --provenance=false --sbom=false -f Dockerfile.worker \
+            -t ${{ steps.ecr.outputs.registry }}/repomod-worker:${{ github.sha }} --push .
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform init
+        working-directory: infra
+      - run: |
+          terraform apply -auto-approve \
+            -var="budget_alert_email=${{ secrets.BUDGET_ALERT_EMAIL }}" \
+            -var="api_image_tag=${{ github.sha }}" \
+            -var="worker_image_tag=${{ github.sha }}"
+        working-directory: infra

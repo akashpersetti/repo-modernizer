@@ -1,30 +1,20 @@
-from fastapi.testclient import TestClient
+import json
+from unittest.mock import MagicMock, patch
 
-from app.api.routes_tasks import configure_runner
+from fastapi.testclient import TestClient
+from langgraph.checkpoint.memory import MemorySaver
+
+from app.api.routes_tasks import configure
+from app.config import Settings
 from app.main import app
 
 
-class FakeTaskRunner:
+class FakeSQS:
     def __init__(self):
-        self.started = []
-        self.approved = []
-        self.resumed = []
+        self.messages = []
 
-    def start(self, repo_url, goal, test_command, base_branch="main"):
-        self.started.append((repo_url, goal, test_command, base_branch))
-        return "fake-task-id"
-
-    def get_status(self, task_id):
-        return {
-            "task_id": task_id, "files": {}, "cost_used_usd": 0.0,
-            "awaiting_approval": None, "error": None, "done": True,
-        }
-
-    def approve(self, task_id, file, decision, note=""):
-        self.approved.append((task_id, file, decision, note))
-
-    def resume(self, task_id):
-        self.resumed.append(task_id)
+    def send_message(self, QueueUrl, MessageBody):
+        self.messages.append({"QueueUrl": QueueUrl, "MessageBody": json.loads(MessageBody)})
 
 
 def test_health():
@@ -35,8 +25,9 @@ def test_health():
 
 
 def test_create_task_returns_task_id():
-    fake = FakeTaskRunner()
-    configure_runner(fake)
+    fake_sqs = FakeSQS()
+    settings = Settings()
+    configure(settings, sqs_client=fake_sqs)
     client = TestClient(app)
 
     response = client.post("/tasks", json={
@@ -44,38 +35,70 @@ def test_create_task_returns_task_id():
     })
 
     assert response.status_code == 200
-    assert response.json()["task_id"] == "fake-task-id"
-    assert fake.started == [("https://github.com/x/y", "migrate", "pytest -q", "main")]
+    task_id = response.json()["task_id"]
+    assert len(task_id) == 8
+    assert len(fake_sqs.messages) == 1
+    msg = fake_sqs.messages[0]["MessageBody"]
+    assert msg["action"] == "start"
+    assert msg["repo_url"] == "https://github.com/x/y"
+
+
+def test_create_task_rejects_non_github_urls():
+    fake_sqs = FakeSQS()
+    settings = Settings()
+    configure(settings, sqs_client=fake_sqs)
+    client = TestClient(app)
+
+    response = client.post("/tasks", json={
+        "repo_url": "https://gitlab.com/x/y", "goal": "migrate", "test_command": "pytest -q",
+    })
+
+    assert response.status_code == 422
 
 
 def test_get_task_status():
-    fake = FakeTaskRunner()
-    configure_runner(fake)
-    client = TestClient(app)
+    with patch("app.api.routes_tasks.DynamoDBCheckpointer", return_value=MemorySaver()):
+        fake_sqs = FakeSQS()
+        settings = Settings()
+        configure(settings, sqs_client=fake_sqs)
+        client = TestClient(app)
 
-    response = client.get("/tasks/fake-task-id")
+        response = client.get("/tasks/fake-task-id")
 
-    assert response.status_code == 200
-    assert response.json()["done"] is True
+        assert response.status_code == 200
+        data = response.json()
+        assert "task_id" in data
+        assert "files" in data
+        assert "cost_used_usd" in data
+        assert "done" in data
 
 
-def test_approve_task_resumes():
-    fake = FakeTaskRunner()
-    configure_runner(fake)
+def test_approve_task_enqueues():
+    fake_sqs = FakeSQS()
+    settings = Settings()
+    configure(settings, sqs_client=fake_sqs)
     client = TestClient(app)
 
     response = client.post("/tasks/fake-task-id/approve", json={"file": "a.py", "decision": "approve"})
 
     assert response.status_code == 200
-    assert fake.approved == [("fake-task-id", "a.py", "approve", "")]
+    assert response.json()["status"] == "enqueued"
+    assert len(fake_sqs.messages) == 1
+    msg = fake_sqs.messages[0]["MessageBody"]
+    assert msg["action"] == "approve"
+    assert msg["task_id"] == "fake-task-id"
 
 
-def test_resume_task():
-    fake = FakeTaskRunner()
-    configure_runner(fake)
+def test_resume_task_enqueues():
+    fake_sqs = FakeSQS()
+    settings = Settings()
+    configure(settings, sqs_client=fake_sqs)
     client = TestClient(app)
 
     response = client.post("/tasks/fake-task-id/resume")
 
     assert response.status_code == 200
-    assert fake.resumed == ["fake-task-id"]
+    assert response.json()["status"] == "enqueued"
+    assert len(fake_sqs.messages) == 1
+    msg = fake_sqs.messages[0]["MessageBody"]
+    assert msg["action"] == "resume"

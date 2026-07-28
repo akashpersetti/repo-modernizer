@@ -1,0 +1,17 @@
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY pyproject.toml uv.lock ./
+# dev deps (pytest, flask) ship here deliberately: the worker's job is to run
+# a cloned target repo's own test_command, and those two are the toolchain
+# repomodernizer's own migration fixtures/demo targets are built against.
+RUN pip install --no-cache-dir uv \
+    && uv export --frozen -o requirements.txt \
+    && grep -v "^-e" requirements.txt > requirements-prod.txt \
+    && pip install --no-cache-dir -r requirements-prod.txt
+
+COPY app ./app
+
+ENTRYPOINT ["python", "-m", "app.worker.entrypoint"]

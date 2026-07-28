@@ -1,0 +1,12 @@
+FROM public.ecr.aws/lambda/python:3.12
+
+COPY pyproject.toml uv.lock ${LAMBDA_TASK_ROOT}/
+RUN pip install --no-cache-dir uv \
+    && cd ${LAMBDA_TASK_ROOT} \
+    && uv export --frozen --no-dev -o requirements.txt \
+    && grep -v "^-e" requirements.txt > requirements-prod.txt \
+    && pip install --no-cache-dir -r requirements-prod.txt --target "${LAMBDA_TASK_ROOT}"
+
+COPY app ${LAMBDA_TASK_ROOT}/app
+
+CMD ["app.lambda_handler.handler"]
