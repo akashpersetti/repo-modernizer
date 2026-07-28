@@ -51,7 +51,10 @@ data "aws_iam_policy_document" "github_deploy_perms" {
     resources = ["*"]
   }
   statement {
-    actions   = ["ecs:RegisterTaskDefinition", "ecs:DescribeTaskDefinition"]
+    # DeregisterTaskDefinition: bumping the image tag forces a replace (not
+    # in-place revision update) of aws_ecs_task_definition.worker -- found
+    # live in Task 11's first real deploy run.
+    actions   = ["ecs:RegisterTaskDefinition", "ecs:DescribeTaskDefinition", "ecs:DeregisterTaskDefinition"]
     resources = ["*"]
   }
   statement {
