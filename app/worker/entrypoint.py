@@ -1,4 +1,5 @@
 import os
+import subprocess
 from pathlib import Path
 
 import boto3
@@ -46,6 +47,13 @@ def _finalize_if_done(result: dict, token: str) -> None:
 
 
 def run(checkpointer_factory=None, deps_factory=None, github_token=None) -> None:
+    # The EFS access point enforces uid 1000 on every file it writes, regardless of the
+    # writing process's actual uid -- but this container runs as root. Git >=2.35.2's
+    # dubious-ownership check (CVE-2022-24765) then refuses any git invocation that
+    # re-discovers a repo under /mnt/workspace (everything after the process that
+    # created it), so every git command must be trusted explicitly.
+    subprocess.run(["git", "config", "--global", "--add", "safe.directory", "*"], check=True)
+
     settings = Settings()
     checkpointer = (checkpointer_factory or (lambda: DynamoDBCheckpointer(table_name=settings.ddb_table_checkpoints)))()
     deps = (deps_factory or (lambda: _default_deps_factory(settings)))()
