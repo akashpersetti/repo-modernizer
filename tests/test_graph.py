@@ -1,8 +1,10 @@
 # tests/test_graph.py
 import difflib
 import json
+import subprocess
 from pathlib import Path
 
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
 
 from app.agent.budget import BudgetTracker
@@ -144,3 +146,40 @@ def test_migrate_graph_retries_on_apply_failure(tmp_path: Path, monkeypatch):
     assert result["files"]["app.py"]["status"] == "migrated"
     assert result["files"]["app.py"]["retry_count"] == 1
     assert calls["count"] == 2
+
+
+def test_build_graph_accepts_injected_checkpointer():
+    fake = FakeProviderRouter([json.dumps([])])
+    deps = NodeDeps(
+        providers=fake, budget=BudgetTracker(cap_usd=10.0), forbidden_paths=[],
+        max_diff_lines=400, risk_threshold=0.6, max_retries=2, estimated_cost_per_file=0.01,
+    )
+    injected = MemorySaver()
+
+    graph = build_graph(deps, checkpointer=injected)
+
+    assert graph.checkpointer is injected
+
+
+def test_ingest_node_does_not_crash_on_already_clean_repo(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "webapp.py").write_text("x = 1\n")
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "-c", "user.email=x@x.com", "-c", "user.name=x", "commit", "-q", "-m", "already committed"],
+        cwd=repo, check=True,
+    )
+    # simulates a freshly-cloned repo: tree is already clean, nothing new to stage
+
+    from app.agent.nodes import ingest_node
+    deps = NodeDeps(
+        providers=None, budget=BudgetTracker(cap_usd=10.0), forbidden_paths=[],
+        max_diff_lines=400, risk_threshold=0.6, max_retries=2, estimated_cost_per_file=0.01,
+    )
+    state = {"repo_path": str(repo), "trace": []}
+
+    result = ingest_node(state, deps)  # must not raise
+
+    assert result["trace"][0]["node"] == "ingest"

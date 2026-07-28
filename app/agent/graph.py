@@ -13,7 +13,7 @@ def route_after_migrate(state: GraphState) -> str:
     return "migrate_file"
 
 
-def build_graph(deps: NodeDeps):
+def build_graph(deps: NodeDeps, checkpointer=None):
     graph = StateGraph(GraphState)
     graph.add_node("ingest", partial(ingest_node, deps=deps))
     graph.add_node("plan", partial(plan_node, deps=deps))
@@ -32,4 +32,4 @@ def build_graph(deps: NodeDeps):
     })
     graph.add_edge("finalize", END)
 
-    return graph.compile(checkpointer=MemorySaver())
+    return graph.compile(checkpointer=checkpointer or MemorySaver())

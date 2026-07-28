@@ -52,7 +52,7 @@ def ingest_node(state: GraphState, deps: NodeDeps) -> dict:
     subprocess.run(
         [
             "git", "-c", "user.email=agent@repomodernizer.local", "-c", "user.name=repomodernizer",
-            "commit", "-q", "-m", "baseline",
+            "commit", "-q", "-m", "baseline", "--allow-empty",
         ],
         cwd=workspace, check=True,
     )
