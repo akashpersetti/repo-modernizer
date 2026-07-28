@@ -54,7 +54,9 @@ data "aws_iam_policy_document" "github_deploy_perms" {
     # DeregisterTaskDefinition: bumping the image tag forces a replace (not
     # in-place revision update) of aws_ecs_task_definition.worker -- found
     # live in Task 11's first real deploy run.
-    actions   = ["ecs:RegisterTaskDefinition", "ecs:DescribeTaskDefinition", "ecs:DeregisterTaskDefinition"]
+    # TagResource: the provider auto-applies default_tags (project=repomodernizer)
+    # to every new task def revision it registers -- found live in the retry.
+    actions   = ["ecs:RegisterTaskDefinition", "ecs:DescribeTaskDefinition", "ecs:DeregisterTaskDefinition", "ecs:TagResource"]
     resources = ["*"]
   }
   statement {
