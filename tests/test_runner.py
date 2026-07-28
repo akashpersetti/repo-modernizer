@@ -63,7 +63,6 @@ def test_start_runs_task_to_completion_and_opens_pr(tmp_path, monkeypatch):
     task_id = runner.start(str(seed), "bump x", "true")
 
     assert _wait_until(lambda: runner.get_status(task_id)["done"])
-    time.sleep(0.1)  # small delay to ensure state is fully persisted
     status = runner.get_status(task_id)
     assert status["files"]["webapp.py"]["status"] == "migrated"
     assert len(pr_calls) == 1

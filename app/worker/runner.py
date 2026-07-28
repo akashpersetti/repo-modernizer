@@ -27,6 +27,7 @@ class TaskRunner:
         self.errors: dict[str, str] = {}
         self._graphs: dict[str, object] = {}
         self._repo_ctx: dict[str, RepoContext] = {}
+        self._in_progress: set[str] = set()
 
     def _graph_for(self, task_id: str):
         if task_id not in self._graphs:
@@ -56,6 +57,7 @@ class TaskRunner:
             "test_command": test_command, "plan": [], "files": {},
             "cursor": 0, "cost_used_usd": 0.0, "trace": [],
         }
+        self._in_progress.add(task_id)
         thread = threading.Thread(target=self._run_and_maybe_finalize, args=(task_id, initial_state, config), daemon=True)
         thread.start()
         return task_id
@@ -78,6 +80,8 @@ class TaskRunner:
                 )
         except Exception as exc:  # noqa: BLE001
             self.errors[task_id] = str(exc)
+        finally:
+            self._in_progress.discard(task_id)
 
     def get_status(self, task_id: str) -> dict:
         graph = self._graph_for(task_id)
@@ -93,11 +97,12 @@ class TaskRunner:
             "cost_used_usd": snapshot.values.get("cost_used_usd", 0.0),
             "awaiting_approval": awaiting_approval,
             "error": self.errors.get(task_id),
-            "done": not snapshot.next,
+            "done": not snapshot.next and task_id not in self._in_progress,
         }
 
     def approve(self, task_id: str, file: str, decision: str, note: str = "") -> None:
         config = {"configurable": {"thread_id": task_id}}
+        self._in_progress.add(task_id)
         thread = threading.Thread(
             target=self._run_and_maybe_finalize,
             args=(task_id, Command(resume={"decision": decision, "note": note}), config),
@@ -107,5 +112,6 @@ class TaskRunner:
 
     def resume(self, task_id: str) -> None:
         config = {"configurable": {"thread_id": task_id}}
+        self._in_progress.add(task_id)
         thread = threading.Thread(target=self._run_and_maybe_finalize, args=(task_id, None, config), daemon=True)
         thread.start()
