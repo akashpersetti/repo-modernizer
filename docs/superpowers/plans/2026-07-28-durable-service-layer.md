@@ -1137,7 +1137,7 @@ git commit -m "feat: FastAPI app and task routes"
 **Interfaces:**
 - Consumes: everything from Tasks 2, 3, 5 (real `DynamoDBCheckpointer`, `build_graph`, `TaskRunner`).
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 ```python
 # tests/test_crash_recovery.py
@@ -1270,12 +1270,12 @@ def test_resume_continues_after_simulated_crash_with_fresh_runner(tmp_path, monk
     assert status["files"]["b.py"]["status"] == "migrated"  # completed after resume
 ```
 
-- [ ] **Step 2: Run the test**
+- [x] **Step 2: Run the test**
 
 Run: `.venv/bin/python -m pytest tests/test_crash_recovery.py -v`
 Expected: PASS. This is the automated proof of durable crash recovery — record a terminal run of it (or the manual CLI-equivalent demo) as the interview artifact.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/test_crash_recovery.py
@@ -1293,7 +1293,7 @@ git commit -m "test: automated crash-recovery proof — resume continues from la
 **Interfaces:**
 - Consumes: everything from Tasks 3–6 (real `TaskRunner`, `DynamoDBCheckpointer`, GitHub API) — exercises the whole service end to end.
 
-- [ ] **Step 1: Create the throwaway GitHub repo**
+- [x] **Step 1: Create the throwaway GitHub repo**
 
 ```bash
 mkdir -p /tmp/repomodernizer-demo-target
@@ -1308,7 +1308,7 @@ cd -
 
 Note the resulting repo URL (e.g. `https://github.com/<your-username>/repomodernizer-demo-target`) — used by the live test and demo below. A fine-grained GitHub PAT with `contents:write` and `pull_requests:write` on this repo, set as `GITHUB_APP_TOKEN` in `.env`, is required for both the live test and the real demo.
 
-- [ ] **Step 2: Write the live integration test**
+- [x] **Step 2: Write the live integration test**
 
 ```python
 # tests/test_github_live.py
@@ -1378,12 +1378,12 @@ def test_full_service_migrates_and_opens_real_pr(tmp_path):
     assert any(f["status"] in ("migrated", "approved") for f in status["files"].values())
 ```
 
-- [ ] **Step 3: Run the live test**
+- [x] **Step 3: Run the live test**
 
 Run: `RUN_LIVE_GITHUB_TESTS=1 DEMO_REPO_URL=https://github.com/<your-username>/repomodernizer-demo-target .venv/bin/python -m pytest tests/test_github_live.py -v -s`
 Expected: PASS. Check the demo repo on GitHub — a real PR should now be open with the migration. This is the full end-to-end proof: real Bedrock, real DynamoDB checkpoint, real GitHub PR.
 
-- [ ] **Step 4: Update the README**
+- [x] **Step 4: Update the README**
 
 ```markdown
 # README.md — add a new section after "Run a migration"
