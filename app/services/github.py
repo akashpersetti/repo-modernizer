@@ -1,3 +1,4 @@
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -22,6 +23,10 @@ def create_branch(repo_path: Path, branch_name: str) -> None:
 
 
 def commit_all(repo_path: Path, message: str) -> None:
+    # running the test suite inside the workspace generates __pycache__/*.pyc bytecode --
+    # strip it before staging so it never ends up in the PR diff.
+    for cache_dir in repo_path.rglob("__pycache__"):
+        shutil.rmtree(cache_dir, ignore_errors=True)
     subprocess.run(["git", "add", "-A"], cwd=repo_path, check=True, capture_output=True, text=True)
     subprocess.run(
         [

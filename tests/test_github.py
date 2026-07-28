@@ -56,3 +56,22 @@ def test_create_branch_and_commit_all(tmp_path: Path):
     branch = subprocess.run(["git", "branch", "--show-current"], cwd=dest, check=True, capture_output=True, text=True)
     assert log.stdout.strip() == "bump x"
     assert branch.stdout.strip() == "feature/test"
+
+
+def test_commit_all_excludes_pycache(tmp_path: Path):
+    bare = _init_bare_remote(tmp_path)
+    dest = tmp_path / "clone"
+    clone_repo(str(bare), dest, token="")
+    create_branch(dest, "feature/test")
+
+    cache_dir = dest / "__pycache__"
+    cache_dir.mkdir()
+    (cache_dir / "webapp.cpython-312.pyc").write_bytes(b"\x00\x01")
+
+    commit_all(dest, "bump x")
+
+    tracked = subprocess.run(
+        ["git", "ls-tree", "-r", "--name-only", "HEAD"], cwd=dest, check=True, capture_output=True, text=True,
+    ).stdout
+    assert "__pycache__" not in tracked
+    assert not cache_dir.exists()
