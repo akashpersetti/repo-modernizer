@@ -1,0 +1,63 @@
+# .github/workflows/deploy.yml
+name: deploy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync
+      - run: .venv/bin/python -m pytest -q
+
+  plan:
+    needs: test
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform init
+        working-directory: infra
+      - run: terraform plan -var="budget_alert_email=${{ secrets.BUDGET_ALERT_EMAIL }}"
+        working-directory: infra
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr
+      - run: |
+          docker buildx build --platform linux/amd64 --provenance=false --sbom=false -f Dockerfile.api \
+            -t ${{ steps.ecr.outputs.registry }}/repomod-api:${{ github.sha }} --push .
+          docker buildx build --platform linux/amd64 --provenance=false --sbom=false -f Dockerfile.worker \
+            -t ${{ steps.ecr.outputs.registry }}/repomod-worker:${{ github.sha }} --push .
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform init
+        working-directory: infra
+      - run: |
+          terraform apply -auto-approve \
+            -var="budget_alert_email=${{ secrets.BUDGET_ALERT_EMAIL }}" \
+            -var="api_image_tag=${{ github.sha }}" \
+            -var="worker_image_tag=${{ github.sha }}"
+        working-directory: infra
