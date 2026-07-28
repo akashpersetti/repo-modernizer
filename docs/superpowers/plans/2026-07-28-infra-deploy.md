@@ -1325,7 +1325,7 @@ git commit -m "feat: API/consumer Lambdas, Fargate task definition with EFS-moun
 **Interfaces:**
 - Produces: `aws_apigatewayv2_api.main`, output `api_url`.
 
-- [ ] **Step 1: Write apigateway.tf**
+- [x] **Step 1: Write apigateway.tf**
 
 ```hcl
 # infra/apigateway.tf
@@ -1366,15 +1366,15 @@ output "api_url" {
 }
 ```
 
-- [ ] **Step 2: Plan and apply**
+- [x] **Step 2: Plan and apply**
 
 Run: `cd infra && terraform apply -var="budget_alert_email=<your-email>"`
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `curl -s $(terraform output -raw api_url)/health` → `{"status":"ok"}`. This is the first real end-to-end proof the API Lambda is reachable and running.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add infra/apigateway.tf
@@ -1391,7 +1391,7 @@ git commit -m "feat: API Gateway HTTP API fronting the API Lambda"
 **Interfaces:**
 - Produces: `aws_budgets_budget.alert` ($5), `.ceiling` ($10).
 
-- [ ] **Step 1: Write budgets.tf**
+- [x] **Step 1: Write budgets.tf**
 
 ```hcl
 # infra/budgets.tf
@@ -1445,15 +1445,15 @@ resource "aws_budgets_budget" "ceiling" {
 }
 ```
 
-- [ ] **Step 2: Plan and apply**
+- [x] **Step 2: Plan and apply**
 
 Run: `cd infra && terraform apply -var="budget_alert_email=<your-email>"`
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `aws budgets describe-budgets --account-id 914697327092 --query 'Budgets[*].BudgetName'` → both `repomodernizer-alert` and `repomodernizer-ceiling` present.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add infra/budgets.tf
