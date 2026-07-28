@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     github_app_token: str = ""
     github_default_base_branch: str = "main"
     ddb_table_checkpoints: str = "repomod-checkpoints"
+    sqs_queue_url: str = ""
 
     def forbidden_paths_list(self) -> list[str]:
         return [p.strip() for p in self.forbidden_paths.split(",") if p.strip()]

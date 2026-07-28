@@ -26,3 +26,6 @@ class GraphState(TypedDict):
     cursor: int
     cost_used_usd: float
     trace: list[dict]
+    repo_url: str
+    branch: str
+    base_branch: str
