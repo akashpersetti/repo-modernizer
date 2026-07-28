@@ -138,7 +138,7 @@ git commit -m "feat: config for GitHub/DynamoDB, checkpoints table creation scri
 **Interfaces:**
 - Modifies: `build_graph(deps: NodeDeps, checkpointer=None)` — now accepts an optional checkpointer, defaults to `MemorySaver()` (unchanged default behavior for every existing caller).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 # tests/test_graph.py — add these
@@ -184,12 +184,12 @@ def test_ingest_node_does_not_crash_on_already_clean_repo(tmp_path):
     assert result["trace"][0]["node"] == "ingest"
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/bin/python -m pytest tests/test_graph.py -k "injected_checkpointer or already_clean" -v`
 Expected: first FAILs with `TypeError: build_graph() got an unexpected keyword argument 'checkpointer'`; second FAILs with `CalledProcessError` (git commit exits non-zero: "nothing to commit").
 
-- [ ] **Step 3: Make the fixes**
+- [x] **Step 3: Make the fixes**
 
 ```python
 # app/agent/graph.py — change the function signature and compile() call
@@ -226,12 +226,12 @@ def build_graph(deps: NodeDeps, checkpointer=None):
     )
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `.venv/bin/python -m pytest -q`
 Expected: full suite passes (46+ tests) — the `--allow-empty` and injectable-checkpointer changes must not break any sub-project 1 test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/agent/graph.py app/agent/nodes.py tests/test_graph.py
