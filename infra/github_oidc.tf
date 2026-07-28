@@ -81,6 +81,18 @@ resource "aws_iam_role_policy" "github_deploy_perms" {
   policy = data.aws_iam_policy_document.github_deploy_perms.json
 }
 
+# terraform plan/apply refreshes every resource in state before doing
+# anything -- that's a read (Describe/Get/List) across every service this
+# stack touches (ec2, efs, dynamodb, sqs, iam, logs, apigateway, budgets...),
+# not just the narrow write actions above. Found live in Task 11: `plan`
+# failed piling up AccessDenied one service at a time (iam:GetRole,
+# logs:DescribeLogGroups, sqs:GetQueueAttributes, ec2:DescribeVpcs...).
+# ReadOnlyAccess is read-only by definition, so this can't grant any mutation.
+resource "aws_iam_role_policy_attachment" "github_deploy_read" {
+  role       = aws_iam_role.github_deploy.name
+  policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
+}
+
 output "github_deploy_role_arn" {
   value = aws_iam_role.github_deploy.arn
 }
