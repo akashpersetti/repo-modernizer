@@ -513,12 +513,12 @@ def test_create_branch_and_commit_all(tmp_path: Path):
     assert branch.stdout.strip() == "feature/test"
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/bin/python -m pytest tests/test_github.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named 'app.services.github'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```python
 # app/services/github.py
@@ -584,12 +584,12 @@ def open_pull_request(repo_url: str, branch: str, base: str, title: str, body: s
     return response.json()["html_url"]
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `.venv/bin/python -m pytest tests/test_github.py -v`
 Expected: PASS (2 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/services/github.py tests/test_github.py
