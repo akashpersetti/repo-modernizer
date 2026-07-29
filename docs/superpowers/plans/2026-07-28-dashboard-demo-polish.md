@@ -996,7 +996,7 @@ git commit -m "feat: wire frontend build+deploy into CI/CD"
 **Files:**
 - Create: `docs/demo_script.md`
 
-- [ ] **Step 1: Write the script**
+- [x] **Step 1: Write the script**
 
 ```markdown
 # RepoModernizer Demo Script
@@ -1031,7 +1031,7 @@ gifski --fps 12 -o demo.gif recording.mov
 Save the result as `docs/demo.gif` — the README embeds it from there.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add docs/demo_script.md
