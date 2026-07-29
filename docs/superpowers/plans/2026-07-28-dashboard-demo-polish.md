@@ -503,7 +503,7 @@ git commit -m "feat: start-migration form (home page)"
 **Interfaces:**
 - Consumes: `getTaskStatus`, `approveTask`, `TaskStatus` from `frontend/lib/api.ts` (Task 2).
 
-- [ ] **Step 1: Write the page**
+- [x] **Step 1: Write the page**
 
 ```tsx
 // frontend/app/task/page.tsx
@@ -632,12 +632,12 @@ export default function TaskPage() {
 }
 ```
 
-- [ ] **Step 2: Build to verify it compiles**
+- [x] **Step 2: Build to verify it compiles**
 
 Run: `cd frontend && npm run build`
 Expected: succeeds, produces `frontend/out/task.html` (or `out/task/index.html`, depending on trailing-slash config — either is fine, S3+CloudFront serves both once `frontend.tf` sets `default_root_object`/error handling correctly in Task 5).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/app/task/page.tsx
