@@ -93,7 +93,11 @@ def get_task(task_id: str):
         files=snapshot.values.get("files", {}),
         cost_used_usd=snapshot.values.get("cost_used_usd", 0.0),
         awaiting_approval=awaiting_approval,
-        done=not snapshot.next,
+        # snapshot.next is also an empty tuple when NO checkpoint exists yet at all
+        # (task enqueued but the Fargate worker hasn't started/reached ingest_node) --
+        # indistinguishable from a genuinely finished task unless we also check that
+        # some checkpoint has actually been written (snapshot.values non-empty).
+        done=bool(snapshot.values) and not snapshot.next,
         pr_url=pr_url,
     )
 

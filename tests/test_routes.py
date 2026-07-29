@@ -104,6 +104,27 @@ def test_resume_task_enqueues():
     assert msg["action"] == "resume"
 
 
+def test_get_task_status_not_done_when_no_checkpoint_exists_yet():
+    # Regression: a task_id with no checkpoint at all (enqueued, worker hasn't
+    # started/reached ingest_node yet) must NOT read as done. snapshot.next is
+    # also an empty tuple in this case, indistinguishable from a truly finished
+    # task unless done also requires snapshot.values to be non-empty. Found
+    # live: submitting via the dashboard and polling immediately showed
+    # "Done -- no files migrated" before the Fargate worker had even started.
+    with patch("app.api.routes_tasks.DynamoDBCheckpointer", return_value=MemorySaver()):
+        fake_sqs = FakeSQS()
+        settings = Settings()
+        configure(settings, sqs_client=fake_sqs)
+        client = TestClient(app)
+
+        response = client.get("/tasks/never-started-task-id")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["done"] is False
+        assert data["files"] == {}
+
+
 def test_get_task_status_includes_pr_url():
     with patch("app.api.routes_tasks.DynamoDBCheckpointer", return_value=MemorySaver()):
         fake_sqs = FakeSQS()
