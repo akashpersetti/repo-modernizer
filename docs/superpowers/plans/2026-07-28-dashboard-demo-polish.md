@@ -1045,7 +1045,7 @@ git commit -m "docs: demo recording script"
 **Files:**
 - Modify: `README.md`
 
-- [ ] **Step 1: Rewrite it**
+- [x] **Step 1: Rewrite it**
 
 ```markdown
 # RepoModernizer
@@ -1147,7 +1147,9 @@ design.
 
 Fill in the literal `<dashboard_url>`/`<api_url>` placeholders with the real values from `terraform output` before committing — this is the one spot in the whole plan where a placeholder is correct, since the real values only exist after Task 5/7's apply.
 
-- [ ] **Step 2: Commit**
+Filled: dashboard_url=https://d12ztzghnd3aa9.cloudfront.net, api_url=https://6yncgq73gk.execute-api.us-east-1.amazonaws.com.
+
+- [x] **Step 2: Commit**
 
 ```bash
 git add README.md
