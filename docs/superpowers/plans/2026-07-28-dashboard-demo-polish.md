@@ -806,7 +806,7 @@ git commit -m "feat: S3 + CloudFront (OAC) for the static dashboard"
 **Interfaces:**
 - Modifies: `aws_apigatewayv2_api.main` gains a `cors_configuration` block.
 
-- [ ] **Step 1: Add the CORS block**
+- [x] **Step 1: Add the CORS block**
 
 ```hcl
 # infra/apigateway.tf — change the aws_apigatewayv2_api.main resource to:
@@ -824,16 +824,20 @@ resource "aws_apigatewayv2_api" "main" {
 
 (Everything else in the file is unchanged.)
 
-- [ ] **Step 2: Plan and apply**
+- [x] **Step 2: Plan and apply**
 
 Run: `cd infra && terraform plan -var="budget_alert_email=<your-email>"` — should show only `aws_apigatewayv2_api.main` changing in place (CORS added), nothing destroyed.
 Run: `terraform apply -var="budget_alert_email=<your-email>"`
 
-- [ ] **Step 3: Verify**
+Note: unscoped plan also showed the same pre-existing `:initial` image-tag drift as Task 5 (unrelated). Applied with `-target=aws_apigatewayv2_api.main` to avoid it.
+
+- [x] **Step 3: Verify**
 
 Run: `curl -s -X OPTIONS https://6yncgq73gk.execute-api.us-east-1.amazonaws.com/tasks -H "Origin: https://$(cd infra && terraform output -raw dashboard_url | sed 's|https://||')" -H "Access-Control-Request-Method: POST" -i | grep -i access-control-allow-origin` → the CloudFront origin echoed back.
 
-- [ ] **Step 4: Commit**
+Found + fixed during verification: the API's single `$default` route forwards OPTIONS straight to Lambda instead of letting API Gateway auto-answer preflight, so the app previously 405'd on OPTIONS. Fixed with a generic `@app.options("/{full_path:path}")` handler in `app/main.py` returning an empty 200 (API Gateway injects the CORS headers onto it regardless, same as it does on error responses) — see commit `20339ff`. User-approved as an out-of-plan fix; both this and the CORS terraform change reviewed clean.
+
+- [x] **Step 4: Commit**
 
 ```bash
 git add infra/apigateway.tf
