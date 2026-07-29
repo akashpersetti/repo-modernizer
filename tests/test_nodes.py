@@ -99,3 +99,35 @@ def test_plan_node_respects_configured_file_extensions(tmp_path):
     assert "webapp.py" not in plan_prompt
     assert "App.test.js" not in plan_prompt
     assert "node_modules" not in plan_prompt
+
+
+def test_migrate_file_node_applies_diff_when_source_lacks_trailing_newline(tmp_path):
+    # Found live against a real JS repo: a source file with no trailing newline
+    # (common in hand-written JS, never exercised by the Python fixtures, which
+    # all happened to end with one) made git apply reject the diff outright --
+    # difflib claimed/implied a newline the real file didn't have. migrate_file_node
+    # must normalize the file on disk before diffing so this can't happen.
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "app.js").write_bytes(b"console.log(1);")  # deliberately no trailing newline
+
+    fake = _FakeProviderRouter([
+        json.dumps([{"path": "app.js", "rationale": "t", "risk_score": 0.1}]),
+        "console.log(2);",  # LLM output also lacks a trailing newline, same as reality
+    ])
+    deps = NodeDeps(
+        providers=fake, budget=BudgetTracker(cap_usd=10.0), forbidden_paths=[],
+        max_diff_lines=400, risk_threshold=0.6, max_retries=2, estimated_cost_per_file=0.01,
+    )
+    graph = build_graph(deps)
+    config = {"configurable": {"thread_id": "no-newline-test"}}
+    state = {
+        "task_id": "no-newline-test", "repo_path": str(repo), "goal": "g", "test_command": "true",
+        "plan": [], "files": {}, "cursor": 0, "cost_used_usd": 0.0, "trace": [],
+        "file_extensions": [".js"],
+    }
+
+    result = graph.invoke(state, config=config)
+
+    assert result["files"]["app.js"]["status"] == "migrated"
+    assert (repo / "app.js").read_text() == "console.log(2);\n"

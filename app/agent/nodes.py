@@ -153,7 +153,20 @@ def migrate_file_node(state: GraphState, deps: NodeDeps) -> dict:
         file_result["status"] = "skipped"
         return _advance(state, path, file_result, deps, note="budget cap reached")
 
-    source = (workspace / path).read_text()
+    # make_diff needs `before` to genuinely match the on-disk file, including its
+    # real trailing-newline status -- git apply matches context against actual
+    # bytes, and difflib never emits the "\ No newline at end of file" marker a
+    # diff against a no-final-newline file would need. Normalizing here (a
+    # harmless, standard change) means every file we ever diff against ends with
+    # "\n", so that whole class of git-apply failure can't happen. Found live
+    # against a real JS repo (Python fixtures never exercised this — Python
+    # source conventionally ends with a newline; plenty of hand-written JS/JSON
+    # doesn't).
+    target_file = workspace / path
+    raw = target_file.read_bytes()
+    if raw and not raw.endswith(b"\n"):
+        target_file.write_bytes(raw + b"\n")
+    source = target_file.read_text()
     error_context = f"\nPrevious attempt failed: {file_result['last_error']}" if file_result["last_error"] else ""
     prompt = (
         f"Goal: {state['goal']}\nFile: {path}\n\n{source}\n{error_context}\n\n"

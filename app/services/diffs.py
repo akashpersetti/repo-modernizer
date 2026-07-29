@@ -36,12 +36,16 @@ def make_diff(before: str, after: str, path: str) -> str:
     new file content, and we compute the diff ourselves so context lines always
     match the real on-disk content byte-for-byte, guaranteeing `git apply` succeeds.
 
-    Normalizes a missing trailing newline on either side first — LLMs routinely
-    omit the final newline in generated content, and a before/after mismatch on
-    that alone produces a diff `git apply` rejects as corrupt.
+    Callers must ensure `before` reflects the real on-disk file byte-for-byte --
+    including its actual trailing-newline status. `git apply` matches context
+    against real file bytes; claiming a trailing newline the real file doesn't
+    have (or vice versa) makes the last hunk mismatch and the whole patch gets
+    rejected. difflib.unified_diff also never emits the POSIX no-newline-at-EOF
+    marker a completely honest diff would need in that case, so
+    `nodes.py` normalizes the on-disk file to genuinely end with "\n" before
+    ever calling this — the correct fix is upstream of here, not a marker
+    hand-rolled into this function's output.
     """
-    if before and not before.endswith("\n"):
-        before += "\n"
     if after and not after.endswith("\n"):
         after += "\n"
     return "".join(difflib.unified_diff(
