@@ -34,6 +34,14 @@ def _default_deps_factory(settings: Settings) -> NodeDeps:
 def _finalize_if_done(result: dict, token: str, checkpointer) -> None:
     if "__interrupt__" in result:
         return
+    # A duplicate/redundant approve or resume action (e.g. a second SQS delivery,
+    # or a user re-clicking while a slow Fargate cold start hadn't updated the
+    # checkpoint yet) can reach this point more than once for the same task.
+    # Without this guard, each duplicate re-opens a PR for a branch that already
+    # has one -- GitHub rejects it with a 422, but only after commit_all/push_branch
+    # already ran again, producing a duplicate commit each time.
+    if hasattr(checkpointer, "get_pr_url") and checkpointer.get_pr_url(result["task_id"]) is not None:
+        return
     if any(f["status"] in ("migrated", "approved") for f in result["files"].values()):
         workspace = Path(result["repo_path"])
         github.commit_all(workspace, f"RepoModernizer: {result['goal']}")
@@ -84,10 +92,24 @@ def run(checkpointer_factory=None, deps_factory=None, github_token=None) -> None
         }
         result = graph.invoke(initial_state, config=config)
     elif action == "approve":
-        result = graph.invoke(
-            Command(resume={"decision": os.environ["DECISION"], "note": os.environ.get("NOTE", "")}),
-            config=config,
-        )
+        # migrate_file_node re-executes from its own top on every resume (it re-reads
+        # the LLM for a fresh diff, re-applies it, re-runs tests) -- calling
+        # Command(resume=...) is only safe when there's an actual pending interrupt
+        # to satisfy. A duplicate approve action (a second SQS delivery, or the user
+        # re-clicking while a slow Fargate cold start hadn't yet updated the
+        # checkpoint) has nothing left to resume: the first successful resume already
+        # cleared the interrupt. Calling invoke() again anyway doesn't no-op -- it
+        # re-runs the node fresh, producing a new duplicate commit each time. Found
+        # live: a single approve click produced 6-9 identical commits on the PR.
+        snapshot = graph.get_state(config)
+        has_pending_interrupt = any(t.interrupts for t in snapshot.tasks)
+        if has_pending_interrupt:
+            result = graph.invoke(
+                Command(resume={"decision": os.environ["DECISION"], "note": os.environ.get("NOTE", "")}),
+                config=config,
+            )
+        else:
+            result = snapshot.values
     elif action == "resume":
         result = graph.invoke(None, config=config)
     else:

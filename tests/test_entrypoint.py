@@ -10,6 +10,22 @@ from app.agent.nodes import NodeDeps
 from app.worker import entrypoint
 
 
+class _MemorySaverWithPrUrl(MemorySaver):
+    """MemorySaver lacks put_pr_url/get_pr_url -- real DynamoDBCheckpointer has both.
+    Tests exercising the finalize-idempotency guard need a checkpointer that
+    actually supports it, or they can't tell the guard apart from a no-op."""
+
+    def __init__(self):
+        super().__init__()
+        self._pr_urls = {}
+
+    def put_pr_url(self, task_id, url):
+        self._pr_urls[task_id] = url
+
+    def get_pr_url(self, task_id):
+        return self._pr_urls.get(task_id)
+
+
 class FakeProviderRouter:
     def __init__(self, responses):
         self.responses = list(responses)
@@ -99,6 +115,66 @@ def test_start_then_separate_approve_survives_fresh_container(tmp_path, monkeypa
     graph = build_graph(deps_factory(), checkpointer=checkpointer)
     snapshot = graph.get_state({"configurable": {"thread_id": task_id}})
     assert snapshot.values["files"]["webapp.py"]["status"] == "approved"
+    assert len(pr_calls) == 1
+
+
+def test_duplicate_approve_does_not_reexecute_or_reopen_pr(tmp_path, monkeypatch):
+    """Regression: a second 'approve' action for an already-resolved interrupt must
+    not re-run migrate_file_node (fresh LLM call, fresh commit) or re-open a PR.
+    Found live: a single approve click produced 6-9 duplicate commits on the PR,
+    because nothing guarded against processing the same resume more than once
+    (whether from a genuine duplicate SQS delivery or a user re-clicking while a
+    slow Fargate cold start hadn't yet updated the checkpoint)."""
+    import app.worker.entrypoint as ep
+
+    remote = _make_bare_remote(tmp_path)
+    checkpointer = _MemorySaverWithPrUrl()
+    commit_calls = []
+    pr_calls = []
+    monkeypatch.setattr(ep.github, "commit_all", lambda *a, **k: commit_calls.append(a))
+    monkeypatch.setattr(ep.github, "push_branch", lambda *a, **k: None)
+    monkeypatch.setattr(ep.github, "open_pull_request", lambda *a, **k: pr_calls.append(a) or "https://x/pull/1")
+
+    task_id = "entrypoint-test-duplicate-approve"
+    responses_start = [
+        json.dumps([{"path": "webapp.py", "rationale": "t", "risk_score": 0.9}]),
+        "x = 2\n",
+    ]
+
+    def deps_factory():
+        return NodeDeps(
+            providers=FakeProviderRouter(responses_start), budget=BudgetTracker(cap_usd=10.0),
+            forbidden_paths=[], max_diff_lines=400, risk_threshold=0.6, max_retries=2,
+            estimated_cost_per_file=0.01,
+        )
+
+    env = {
+        "ACTION": "start", "TASK_ID": task_id, "REPO_URL": str(remote),
+        "GOAL": "bump x", "TEST_COMMAND": "true", "WORKSPACE_ROOT": str(tmp_path / "workspace_root"),
+    }
+    monkeypatch.setattr(os, "environ", {**os.environ, **env})
+    ep.run(checkpointer_factory=lambda: checkpointer, deps_factory=deps_factory, github_token="")
+
+    env2 = {
+        "ACTION": "approve", "TASK_ID": task_id, "DECISION": "approve", "NOTE": "",
+        "WORKSPACE_ROOT": str(tmp_path / "workspace_root"),
+    }
+    monkeypatch.setattr(os, "environ", {**os.environ, **env2})
+
+    # Two separate "approve" deliveries for the same already-pending interrupt --
+    # e.g. a genuine second SQS delivery, or the user re-clicking.
+    for _ in range(2):
+        ep.run(
+            checkpointer_factory=lambda: checkpointer,
+            deps_factory=lambda: NodeDeps(
+                providers=FakeProviderRouter([]), budget=BudgetTracker(cap_usd=10.0),
+                forbidden_paths=[], max_diff_lines=400, risk_threshold=0.6, max_retries=2,
+                estimated_cost_per_file=0.01,
+            ),
+            github_token="",
+        )
+
+    assert len(commit_calls) == 1
     assert len(pr_calls) == 1
 
 

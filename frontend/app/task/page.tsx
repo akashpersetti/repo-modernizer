@@ -10,6 +10,13 @@ function TaskView() {
   const [status, setStatus] = useState<TaskStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [acting, setActing] = useState(false);
+  // The worker can take 20-60s+ to actually process a decision (Fargate cold start,
+  // clone, LLM call) -- polling during that window still returns the same stale
+  // "awaiting_approval" from before the decision was submitted, which would
+  // otherwise make the approve/reject buttons reappear and invite a second,
+  // genuinely duplicate submission. Track the diff we already decided on and
+  // show a waiting state instead until the server actually reflects a change.
+  const [submittedFor, setSubmittedFor] = useState<string | null>(null);
 
   useEffect(() => {
     if (!taskId) return;
@@ -39,10 +46,11 @@ function TaskView() {
 
   async function handleDecision(decision: "approve" | "reject") {
     if (!status?.awaiting_approval) return;
+    const diffKey = status.awaiting_approval.diff;
     setActing(true);
     try {
       await approveTask(taskId, status.awaiting_approval.path, decision);
-      setStatus((prev) => (prev ? { ...prev, awaiting_approval: null } : prev));
+      setSubmittedFor(diffKey);
     } catch (err) {
       setError(`Approve action failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -64,7 +72,7 @@ function TaskView() {
         </div>
       )}
 
-      {status.awaiting_approval && (
+      {status.awaiting_approval && status.awaiting_approval.diff !== submittedFor && (
         <div className="border border-yellow-400 bg-yellow-50 rounded p-4 space-y-3">
           <p className="font-medium">
             Awaiting approval — {status.awaiting_approval.path} (risk {status.awaiting_approval.risk_score.toFixed(2)})
@@ -88,6 +96,13 @@ function TaskView() {
               Reject
             </button>
           </div>
+        </div>
+      )}
+
+      {status.awaiting_approval && status.awaiting_approval.diff === submittedFor && (
+        <div className="border border-blue-300 bg-blue-50 rounded p-4">
+          <p className="font-medium">Decision submitted — waiting for the worker to process.</p>
+          <p className="text-sm text-gray-600">This can take up to a minute (cold start). No need to click again.</p>
         </div>
       )}
 
