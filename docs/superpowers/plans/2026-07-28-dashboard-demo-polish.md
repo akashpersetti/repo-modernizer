@@ -35,7 +35,7 @@
 
 **Note:** both `test_entrypoint.py` and `test_routes.py`'s existing tests inject `MemorySaver()` (LangGraph's built-in in-memory checkpointer) in place of `DynamoDBCheckpointer` — `MemorySaver` has no `put_pr_url`/`get_pr_url`. Both call sites guard with `hasattr(checkpointer, "...")` so those existing tests keep passing unmodified, while production (which always uses the real `DynamoDBCheckpointer`) stores/reads the URL for real.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 # tests/test_checkpointer.py — add this test
@@ -98,12 +98,12 @@ def test_get_task_status_includes_pr_url():
         assert response.json()["pr_url"] is None  # MemorySaver has no get_pr_url -- must not crash
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/bin/python -m pytest tests/test_checkpointer.py::test_put_and_get_pr_url_roundtrip tests/test_entrypoint.py::test_finalize_stores_pr_url_when_migration_completes tests/test_routes.py::test_get_task_status_includes_pr_url -v`
 Expected: FAIL — `AttributeError: 'DynamoDBCheckpointer' object has no attribute 'put_pr_url'` and `pr_url` missing from the routes response.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```python
 # app/agent/checkpointer.py — add these two methods to DynamoDBCheckpointer,
@@ -168,12 +168,12 @@ And in `get_task()`, add the lookup and pass it through:
     )
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `.venv/bin/python -m pytest -q`
 Expected: full suite passes.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/agent/checkpointer.py app/worker/entrypoint.py app/api/routes_tasks.py \
