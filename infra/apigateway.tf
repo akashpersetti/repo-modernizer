@@ -26,6 +26,14 @@ resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.main.id
   name        = "$default"
   auto_deploy = true
+
+  # API has no auth -- CORS is a browser-only control, curl can hit it directly,
+  # and every accepted task spends real Bedrock/Fargate money. This caps blast
+  # radius now that the dashboard has published the URL publicly.
+  default_route_settings {
+    throttling_rate_limit  = 5
+    throttling_burst_limit = 10
+  }
 }
 
 resource "aws_lambda_permission" "apigw" {
