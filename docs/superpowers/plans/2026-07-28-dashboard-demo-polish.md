@@ -850,7 +850,7 @@ git commit -m "feat: enable CORS on API Gateway for the dashboard's client-side 
 
 **Files:** none — this task is pure verification/deployment, no new files.
 
-- [ ] **Step 1: Build and deploy**
+- [x] **Step 1: Build and deploy**
 
 ```bash
 cd frontend
@@ -862,13 +862,13 @@ aws cloudfront create-invalidation \
 cd ..
 ```
 
-- [ ] **Step 2: Verify the static site serves correctly**
+- [x] **Step 2: Verify the static site serves correctly**
 
 Run: `curl -s -o /dev/null -w "%{http_code}\n" $(cd infra && terraform output -raw dashboard_url)/` → `200`.
 Run: `curl -s $(cd infra && terraform output -raw dashboard_url)/ | grep -o "RepoModernizer"` → prints `RepoModernizer` (confirms the real page content is being served, not a CloudFront error page).
 Run: `curl -s -o /dev/null -w "%{http_code}\n" "$(cd infra && terraform output -raw dashboard_url)/task?id=anything"` → `200` (**this is the CloudFront Function URI-rewrite fix — if it 403s or 404s, the rewrite didn't attach correctly; re-check `function_association` on the cache behavior before continuing**).
 
-- [ ] **Step 3: Drive one real migration through the dashboard's own API calls**
+- [x] **Step 3: Drive one real migration through the dashboard's own API calls**
 
 This replicates exactly what clicking through the UI does, without needing an actual browser — the same `fetch()` calls the page makes, hitting the same real API:
 
@@ -897,13 +897,17 @@ fi
 cat /tmp/dash_status.json
 ```
 
-- [ ] **Step 4: Confirm `pr_url` is populated**
+- [x] **Step 4: Confirm `pr_url` is populated**
 
 Run: `jq -r .pr_url /tmp/dash_status.json` → a real `https://github.com/akashpersetti/repomodernizer-demo-target/pull/N` URL, not `null`. This is the Task 1 fix proving out for real, not just in the unit test.
 
-- [ ] **Step 5: Actually open the dashboard in a real browser once**
+Result: `pr_url` = `https://github.com/akashpersetti/repomodernizer-demo-target/pull/4`, confirmed also via `gh pr view 4` (open, correct title/branch, `webapp.py` Flask→FastAPI diff). Also found + fixed a real backend gap during this step: OPTIONS preflight was 405ing (see Task 6's Step 3 note) — fixed and reverified live before this run.
+
+- [x] **Step 5: Actually open the dashboard in a real browser once**
 
 Navigate to the `dashboard_url` output, submit the same form, watch it through — the CLI steps above prove the API contract works; this step confirms the UI itself renders and wires up correctly (loading states, the diff `<pre>` block, button disable states) — something no curl script can verify. Note anything visually broken and fix before moving on.
+
+**Note:** no interactive browser/screenshot tool was available in this execution environment (no Playwright MCP connected) — this step could not be performed as literally an interactive click-through. Substituted with: static-markup verification of both routes (fetched raw HTML — confirmed exact form fields/labels/default values/button on `/`, confirmed `/task?id=...` serves its Suspense "Loading..." shell), plus Step 3's full API-contract-driven migration exercising every state transition the `TaskView` component renders for (loading → awaiting_approval with real diff → approve → done with PR link), since the component's source was read directly and its rendering for each `TaskStatus` shape is known. This is a real gap against what the plan asked for — flagged here rather than claimed as done.
 
 ---
 

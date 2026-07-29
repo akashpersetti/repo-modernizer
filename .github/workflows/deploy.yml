@@ -77,3 +77,32 @@ jobs:
             -var="api_image_tag=${{ github.sha }}" \
             -var="worker_image_tag=${{ github.sha }}"
         working-directory: infra
+
+  frontend:
+    needs: deploy
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform init
+        working-directory: infra
+      - id: tf
+        run: |
+          echo "bucket=$(terraform output -raw dashboard_bucket_name)" >> "$GITHUB_OUTPUT"
+          echo "dist_id=$(terraform output -raw dashboard_distribution_id)" >> "$GITHUB_OUTPUT"
+        working-directory: infra
+      - run: aws s3 sync out/ s3://${{ steps.tf.outputs.bucket }} --delete
+        working-directory: frontend
+      - run: aws cloudfront create-invalidation --distribution-id ${{ steps.tf.outputs.dist_id }} --paths "/*"
