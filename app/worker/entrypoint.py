@@ -84,11 +84,13 @@ def run(checkpointer_factory=None, deps_factory=None, github_token=None) -> None
         workspace.mkdir(parents=True, exist_ok=True)
         github.clone_repo(repo_url, workspace, token)
         github.create_branch(workspace, branch)
+        file_extensions = [e.strip() for e in os.environ.get("FILE_EXTENSIONS", ".py").split(",") if e.strip()]
         initial_state = {
             "task_id": task_id, "repo_path": str(workspace), "goal": goal,
             "test_command": os.environ["TEST_COMMAND"], "plan": [], "files": {},
             "cursor": 0, "cost_used_usd": 0.0, "trace": [],
             "repo_url": repo_url, "branch": branch, "base_branch": base_branch,
+            "file_extensions": file_extensions,
         }
         result = graph.invoke(initial_state, config=config)
     elif action == "approve":

@@ -68,6 +68,43 @@ def _make_bare_remote(tmp_path):
     return bare
 
 
+def test_start_parses_comma_separated_file_extensions_env_var(tmp_path, monkeypatch):
+    import app.worker.entrypoint as ep
+
+    remote = _make_bare_remote(tmp_path)
+    checkpointer = MemorySaver()
+    monkeypatch.setattr(ep.github, "push_branch", lambda *a, **k: None)
+    monkeypatch.setattr(ep.github, "open_pull_request", lambda *a, **k: "https://x/pull/1")
+
+    task_id = "entrypoint-test-file-extensions"
+    env = {
+        "ACTION": "start", "TASK_ID": task_id, "REPO_URL": str(remote),
+        "GOAL": "bump x", "TEST_COMMAND": "true", "WORKSPACE_ROOT": str(tmp_path / "workspace_root"),
+        "FILE_EXTENSIONS": " .js, .jsx ",  # deliberately spaced/messy, like a human might type it
+    }
+    monkeypatch.setattr(os, "environ", {**os.environ, **env})
+    ep.run(
+        checkpointer_factory=lambda: checkpointer,
+        deps_factory=lambda: NodeDeps(
+            providers=FakeProviderRouter([json.dumps([])]), budget=BudgetTracker(cap_usd=10.0),
+            forbidden_paths=[], max_diff_lines=400, risk_threshold=0.6, max_retries=2,
+            estimated_cost_per_file=0.01,
+        ),
+        github_token="",
+    )
+
+    graph = build_graph(
+        NodeDeps(
+            providers=FakeProviderRouter([]), budget=BudgetTracker(cap_usd=10.0),
+            forbidden_paths=[], max_diff_lines=400, risk_threshold=0.6, max_retries=2,
+            estimated_cost_per_file=0.01,
+        ),
+        checkpointer=checkpointer,
+    )
+    snapshot = graph.get_state({"configurable": {"thread_id": task_id}})
+    assert snapshot.values["file_extensions"] == [".js", ".jsx"]
+
+
 def test_start_then_separate_approve_survives_fresh_container(tmp_path, monkeypatch):
     """The exact scenario that motivated EFS: 'start' and 'approve' run as two
     separate calls (simulating two separate containers) sharing only a checkpointer

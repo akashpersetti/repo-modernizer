@@ -29,3 +29,4 @@ class GraphState(TypedDict):
     repo_url: str
     branch: str
     base_branch: str
+    file_extensions: list[str]

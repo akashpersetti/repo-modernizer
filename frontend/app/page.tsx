@@ -12,6 +12,7 @@ export default function HomePage() {
   const [repoUrl, setRepoUrl] = useState("https://github.com/akashpersetti/repomodernizer-demo-target");
   const [goal, setGoal] = useState("Migrate this Flask app to FastAPI with async route handlers.");
   const [testCommand, setTestCommand] = useState("pytest -q");
+  const [fileExtensions, setFileExtensions] = useState(".py");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -20,7 +21,13 @@ export default function HomePage() {
     setSubmitting(true);
     setError(null);
     try {
-      const { task_id } = await createTask({ repo_url: repoUrl, goal, test_command: testCommand });
+      const extensions = fileExtensions
+        .split(",")
+        .map((ext) => ext.trim())
+        .filter(Boolean);
+      const { task_id } = await createTask({
+        repo_url: repoUrl, goal, test_command: testCommand, file_extensions: extensions,
+      });
       window.location.href = `/task?id=${task_id}`;
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -79,6 +86,17 @@ export default function HomePage() {
             onChange={(e) => setTestCommand(e.target.value)}
             required
           />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">File extensions to migrate</label>
+          <input
+            className="w-full border rounded px-3 py-2"
+            value={fileExtensions}
+            onChange={(e) => setFileExtensions(e.target.value)}
+            placeholder=".py or .js,.jsx"
+            required
+          />
+          <p className="text-xs text-gray-500 mt-1">Comma-separated. Only files with these extensions are planned for migration.</p>
         </div>
         {error && <p className="text-red-600 text-sm">{error}</p>}
         <button

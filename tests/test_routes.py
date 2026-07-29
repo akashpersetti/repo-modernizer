@@ -41,6 +41,23 @@ def test_create_task_returns_task_id():
     msg = fake_sqs.messages[0]["MessageBody"]
     assert msg["action"] == "start"
     assert msg["repo_url"] == "https://github.com/x/y"
+    assert msg["file_extensions"] == ".py"  # default, comma-joined (a plain string, not a JSON list)
+
+
+def test_create_task_accepts_custom_file_extensions():
+    fake_sqs = FakeSQS()
+    settings = Settings()
+    configure(settings, sqs_client=fake_sqs)
+    client = TestClient(app)
+
+    response = client.post("/tasks", json={
+        "repo_url": "https://github.com/x/y", "goal": "migrate", "test_command": "npm test",
+        "file_extensions": [".js", ".jsx"],
+    })
+
+    assert response.status_code == 200
+    msg = fake_sqs.messages[0]["MessageBody"]
+    assert msg["file_extensions"] == ".js,.jsx"
 
 
 def test_create_task_rejects_non_github_urls():

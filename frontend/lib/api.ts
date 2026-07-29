@@ -23,6 +23,7 @@ export async function createTask(input: {
   goal: string;
   test_command: string;
   base_branch?: string;
+  file_extensions?: string[];
 }): Promise<{ task_id: string }> {
   const res = await fetch(`${API_URL}/tasks`, {
     method: "POST",

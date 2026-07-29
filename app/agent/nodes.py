@@ -36,13 +36,25 @@ class NodeDeps:
     estimated_cost_per_file: float
 
 
+_VENDOR_DIR_NAMES = {"node_modules", "venv", ".venv", "dist", "build", "vendor", "site-packages"}
+
+
 def _is_test_file(path: Path) -> bool:
+    parts = set(path.parts)
+    if "tests" in parts or "__tests__" in parts:
+        return True
+    stem = path.stem  # Path.stem only strips the final suffix: "App.test.js" -> "App.test"
     return (
-        "tests" in path.parts
-        or path.stem.startswith("test_")
-        or path.stem.endswith("_test")
-        or path.stem == "conftest"
+        stem == "conftest"
+        or stem.startswith("test_")
+        or stem.endswith("_test")
+        or stem.endswith(".test")
+        or stem.endswith(".spec")
     )
+
+
+def _is_vendor_dir(path: Path) -> bool:
+    return bool(set(path.parts) & _VENDOR_DIR_NAMES)
 
 
 def ingest_node(state: GraphState, deps: NodeDeps) -> dict:
@@ -66,11 +78,13 @@ def ingest_node(state: GraphState, deps: NodeDeps) -> dict:
 
 
 def plan_node(state: GraphState, deps: NodeDeps) -> dict:
-    file_list = sorted(
-        str(p.relative_to(state["repo_path"]))
-        for p in Path(state["repo_path"]).rglob("*.py")
-        if ".git" not in p.parts and not _is_test_file(p)
-    )
+    root = Path(state["repo_path"])
+    file_list = sorted(set(
+        str(p.relative_to(root))
+        for ext in state["file_extensions"]
+        for p in root.rglob(f"*{ext}")
+        if ".git" not in p.parts and not _is_test_file(p) and not _is_vendor_dir(p)
+    ))
     prompt = (
         f"You are planning a code migration. Goal: {state['goal']}\n"
         f"Files in repo:\n" + "\n".join(file_list) + "\n\n"

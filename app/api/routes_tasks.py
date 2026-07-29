@@ -22,6 +22,7 @@ class CreateTaskRequest(BaseModel):
     goal: str
     test_command: str
     base_branch: str = "main"
+    file_extensions: list[str] = [".py"]
 
 
 class CreateTaskResponse(BaseModel):
@@ -67,6 +68,10 @@ def create_task(request: CreateTaskRequest):
     _send({
         "action": "start", "task_id": task_id, "repo_url": request.repo_url,
         "goal": request.goal, "test_command": request.test_command, "base_branch": request.base_branch,
+        # comma-joined, not a JSON list -- consumer_handler.py forwards every SQS
+        # message value as a plain env var via str(v); a Python list would become
+        # "['.py', '.js']" (repr), not the ".py,.js" entrypoint.py expects to split on.
+        "file_extensions": ",".join(request.file_extensions),
     })
     return CreateTaskResponse(task_id=task_id)
 

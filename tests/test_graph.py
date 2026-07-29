@@ -43,6 +43,7 @@ def _initial_state(repo_path: str, goal: str, test_command: str) -> dict:
         "cursor": 0,
         "cost_used_usd": 0.0,
         "trace": [],
+        "file_extensions": [".py"],
     }
 
 

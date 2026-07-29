@@ -51,6 +51,7 @@ def test_migrate_sample_repo_flask_to_fastapi(tmp_path):
         "cursor": 0,
         "cost_used_usd": 0.0,
         "trace": [],
+        "file_extensions": [".py"],
     }
 
     result = graph.invoke(initial_state, config=config)

@@ -20,13 +20,17 @@ def main() -> None:
     run_parser.add_argument("--repo", required=True)
     run_parser.add_argument("--goal", required=True)
     run_parser.add_argument("--test-cmd", required=True)
+    run_parser.add_argument(
+        "--file-ext", action="append", default=None,
+        help="file extension to migrate, e.g. --file-ext .py (repeatable for multiple). Defaults to .py",
+    )
     args = parser.parse_args()
 
     if args.command == "run":
-        run(args.repo, args.goal, args.test_cmd)
+        run(args.repo, args.goal, args.test_cmd, args.file_ext)
 
 
-def run(repo_path: str, goal: str, test_command: str) -> None:
+def run(repo_path: str, goal: str, test_command: str, file_extensions: list[str] | None = None) -> None:
     settings = Settings()
     task_id = uuid.uuid4().hex[:8]
     run_dir = Path("runs") / task_id
@@ -61,6 +65,7 @@ def run(repo_path: str, goal: str, test_command: str) -> None:
         "cursor": 0,
         "cost_used_usd": 0.0,
         "trace": [],
+        "file_extensions": file_extensions or [".py"],
     }
 
     result = graph.invoke(initial_state, config=config)
