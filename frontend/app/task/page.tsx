@@ -28,7 +28,17 @@ function TaskView() {
         if (!cancelled) {
           setStatus(s);
           setError(null);
-          if (s.done && timer.id !== undefined) {
+          // finalize (git push, PR open, pr_url write) runs as a separate step
+          // after the graph's own "done" checkpoint -- pr_url can lag done by a
+          // few seconds. Stopping on done alone can catch that gap and never
+          // poll again, permanently showing "no PR opened" even though one
+          // exists. Only stop once the result is actually stable: either a
+          // real PR link arrived, or nothing was migrated so none is coming.
+          const anyMigrated = Object.values(s.files).some(
+            (f) => f.status === "migrated" || f.status === "approved"
+          );
+          const finalized = s.done && (s.pr_url !== null || !anyMigrated);
+          if (finalized && timer.id !== undefined) {
             clearInterval(timer.id);
           }
         }
@@ -129,18 +139,25 @@ function TaskView() {
 
       <p className="text-sm text-gray-600">Total cost: ${status.cost_used_usd.toFixed(4)}</p>
 
-      {status.done && (
-        <div className="border border-green-400 bg-green-50 rounded p-4">
-          <p className="font-medium">Done.</p>
-          {status.pr_url ? (
-            <a href={status.pr_url} target="_blank" rel="noreferrer" className="text-blue-600 underline">
-              View pull request
-            </a>
-          ) : (
-            <p className="text-sm text-gray-600">No files were migrated — no PR opened.</p>
-          )}
-        </div>
-      )}
+      {status.done && (() => {
+        const anyMigrated = Object.values(status.files).some(
+          (f) => f.status === "migrated" || f.status === "approved"
+        );
+        return (
+          <div className="border border-green-400 bg-green-50 rounded p-4">
+            <p className="font-medium">Done.</p>
+            {status.pr_url ? (
+              <a href={status.pr_url} target="_blank" rel="noreferrer" className="text-blue-600 underline">
+                View pull request
+              </a>
+            ) : anyMigrated ? (
+              <p className="text-sm text-gray-600">Opening pull request...</p>
+            ) : (
+              <p className="text-sm text-gray-600">No files were migrated — no PR opened.</p>
+            )}
+          </div>
+        );
+      })()}
     </main>
   );
 }
