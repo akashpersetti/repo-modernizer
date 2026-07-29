@@ -1162,7 +1162,7 @@ git commit -m "docs: README rewrite — demo, live links, full architecture, cos
 
 **Files:** none.
 
-- [ ] **Step 1: Confirm everything is actually live**
+- [x] **Step 1: Confirm everything is actually live**
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}\n" $(cd infra && terraform output -raw dashboard_url)/
@@ -1170,18 +1170,26 @@ curl -s $(cd infra && terraform output -raw api_url)/health
 ```
 Expected: `200` and `{"status":"ok"}`.
 
-- [ ] **Step 2: Full test suite one more time**
+Result: `200` and `{"status":"ok"}` — matches exactly.
+
+- [x] **Step 2: Full test suite one more time**
 
 Run: `.venv/bin/python -m pytest -q`
 Expected: full suite passes.
 
-- [ ] **Step 3: Confirm git is clean and everything is pushed**
+Result: `69 passed, 1 skipped` (up from 66/1 baseline — Task 1's 3 new tests).
+
+- [x] **Step 3: Confirm git is clean and everything is pushed**
 
 Run: `git status --short` (expect empty) and `git log origin/main..main --oneline` (expect empty).
+
+Result: both empty, confirmed in the worktree branch and the primary checkout, and `git fetch` + diff both directions against `origin/main` confirms zero divergence.
 
 - [ ] **Step 4: Record the demo**
 
 Follow `docs/demo_script.md`, save the result as `docs/demo.gif`, commit it, confirm it renders in the README on GitHub.
+
+**NOT DONE — open item.** This execution environment has no interactive screen-recording capability (no browser/screen-capture tool available). Recording a real demo GIF requires an actual screen capture per `docs/demo_script.md`, which cannot be fabricated. Left as the one open task; `docs/demo_script.md` (Task 9) has the exact steps to record it manually. Until this lands, README.md's `![demo](docs/demo.gif)` embed will render as a broken image on GitHub.
 
 ```bash
 git add docs/demo.gif
