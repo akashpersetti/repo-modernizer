@@ -6,7 +6,7 @@ test suite after every change, pauses for human approval on risky diffs, survive
 mid-migration, fails over across model providers, enforces a hard cost cap, and opens a real pull
 request — end to end, deployed on AWS.
 
-<!-- ![demo](docs/demo.gif) -->
+![demo](./demo.gif)
 <!-- Uncomment the line above once docs/demo.gif is recorded (see docs/demo_script.md locally). -->
 
 **Resume line:** *"Built a durable long-horizon coding agent on AWS with per-step DynamoDB
