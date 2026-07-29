@@ -2,6 +2,11 @@
 
 import { useState } from "react";
 import { createTask } from "@/lib/api";
+import HowItWorks from "./components/HowItWorks";
+import ArchitectureModal from "./components/ArchitectureModal";
+import GithubIcon from "./components/GithubIcon";
+
+const GITHUB_REPO_URL = "https://github.com/akashpersetti/repo-modernizer";
 
 export default function HomePage() {
   const [repoUrl, setRepoUrl] = useState("https://github.com/akashpersetti/repomodernizer-demo-target");
@@ -25,10 +30,28 @@ export default function HomePage() {
 
   return (
     <main className="max-w-xl mx-auto py-16 px-4">
+      <div className="mb-4 flex justify-end gap-2">
+        <ArchitectureModal />
+        <a
+          href={GITHUB_REPO_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 rounded border px-3 py-1.5 text-sm hover:bg-gray-50"
+        >
+          <GithubIcon className="size-3.5" />
+          Source code
+        </a>
+      </div>
+
       <h1 className="text-2xl font-semibold mb-2">RepoModernizer</h1>
       <p className="text-gray-600 mb-6 text-sm">
         Autonomous repository modernization agent — durable, human-gated, deployed on AWS.
       </p>
+
+      <div className="mb-10">
+        <HowItWorks />
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium mb-1">Repo URL</label>
