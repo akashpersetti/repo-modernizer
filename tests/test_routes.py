@@ -102,3 +102,17 @@ def test_resume_task_enqueues():
     assert len(fake_sqs.messages) == 1
     msg = fake_sqs.messages[0]["MessageBody"]
     assert msg["action"] == "resume"
+
+
+def test_get_task_status_includes_pr_url():
+    with patch("app.api.routes_tasks.DynamoDBCheckpointer", return_value=MemorySaver()):
+        fake_sqs = FakeSQS()
+        settings = Settings()
+        configure(settings, sqs_client=fake_sqs)
+        client = TestClient(app)
+
+        response = client.get("/tasks/fake-task-id")
+
+        assert response.status_code == 200
+        assert "pr_url" in response.json()
+        assert response.json()["pr_url"] is None  # MemorySaver has no get_pr_url -- must not crash

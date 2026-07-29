@@ -58,3 +58,10 @@ def test_put_writes_surfaces_as_pending_writes():
     result = _checkpointer.get_tuple({"configurable": {"thread_id": thread_id}})
 
     assert result.pending_writes == [["task-1", "files", {"a.py": "pending"}]]
+
+
+def test_put_and_get_pr_url_roundtrip():
+    thread_id = f"test-{uuid.uuid4().hex[:8]}"
+    assert _checkpointer.get_pr_url(thread_id) is None
+    _checkpointer.put_pr_url(thread_id, "https://github.com/x/y/pull/1")
+    assert _checkpointer.get_pr_url(thread_id) == "https://github.com/x/y/pull/1"

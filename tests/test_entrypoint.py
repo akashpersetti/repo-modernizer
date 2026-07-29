@@ -1,5 +1,6 @@
 import json
 import os
+import uuid
 
 from langgraph.checkpoint.memory import MemorySaver
 
@@ -99,3 +100,37 @@ def test_start_then_separate_approve_survives_fresh_container(tmp_path, monkeypa
     snapshot = graph.get_state({"configurable": {"thread_id": task_id}})
     assert snapshot.values["files"]["webapp.py"]["status"] == "approved"
     assert len(pr_calls) == 1
+
+
+def test_finalize_stores_pr_url_when_migration_completes(tmp_path, monkeypatch):
+    import app.worker.entrypoint as ep
+    from app.agent.checkpointer import DynamoDBCheckpointer
+    from app.config import Settings
+
+    remote = _make_bare_remote(tmp_path)
+    settings = Settings()
+    checkpointer = DynamoDBCheckpointer(table_name=settings.ddb_table_checkpoints)
+    monkeypatch.setattr(ep.github, "push_branch", lambda *a, **k: None)
+    monkeypatch.setattr(ep.github, "open_pull_request", lambda *a, **k: "https://github.com/x/y/pull/42")
+
+    task_id = f"pr-url-test-{uuid.uuid4().hex[:8]}"
+    responses = [
+        json.dumps([{"path": "webapp.py", "rationale": "t", "risk_score": 0.1}]),
+        "x = 2\n",
+    ]
+
+    def deps_factory():
+        return NodeDeps(
+            providers=FakeProviderRouter(responses), budget=BudgetTracker(cap_usd=10.0),
+            forbidden_paths=[], max_diff_lines=400, risk_threshold=0.6, max_retries=2,
+            estimated_cost_per_file=0.01,
+        )
+
+    env = {
+        "ACTION": "start", "TASK_ID": task_id, "REPO_URL": str(remote),
+        "GOAL": "bump x", "TEST_COMMAND": "true", "WORKSPACE_ROOT": str(tmp_path / "workspace_root"),
+    }
+    monkeypatch.setattr(os, "environ", {**os.environ, **env})
+    ep.run(checkpointer_factory=lambda: checkpointer, deps_factory=deps_factory, github_token="")
+
+    assert checkpointer.get_pr_url(task_id) == "https://github.com/x/y/pull/42"

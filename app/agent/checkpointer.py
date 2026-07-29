@@ -95,3 +95,14 @@ class DynamoDBCheckpointer(BaseCheckpointSaver):
         )
         for item in resp.get("Items", []):
             yield self._tuple_from_item(thread_id, item)
+
+    def put_pr_url(self, task_id: str, url: str) -> None:
+        self._table.put_item(Item={
+            "PK": f"TASK#{task_id}", "SK": "PR_URL", "url": url,
+            "ttl": int(time.time()) + _TTL_SECONDS,
+        })
+
+    def get_pr_url(self, task_id: str) -> Optional[str]:
+        resp = self._table.get_item(Key={"PK": f"TASK#{task_id}", "SK": "PR_URL"})
+        item = resp.get("Item")
+        return item["url"] if item else None

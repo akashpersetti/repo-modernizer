@@ -31,19 +31,21 @@ def _default_deps_factory(settings: Settings) -> NodeDeps:
     )
 
 
-def _finalize_if_done(result: dict, token: str) -> None:
+def _finalize_if_done(result: dict, token: str, checkpointer) -> None:
     if "__interrupt__" in result:
         return
     if any(f["status"] in ("migrated", "approved") for f in result["files"].values()):
         workspace = Path(result["repo_path"])
         github.commit_all(workspace, f"RepoModernizer: {result['goal']}")
         github.push_branch(workspace, result["branch"], token)
-        github.open_pull_request(
+        pr_url = github.open_pull_request(
             result["repo_url"], result["branch"], result["base_branch"],
             title=f"RepoModernizer: {result['goal']}",
             body="Opened automatically by RepoModernizer.",
             token=token,
         )
+        if hasattr(checkpointer, "put_pr_url"):
+            checkpointer.put_pr_url(result["task_id"], pr_url)
 
 
 def run(checkpointer_factory=None, deps_factory=None, github_token=None) -> None:
@@ -91,7 +93,7 @@ def run(checkpointer_factory=None, deps_factory=None, github_token=None) -> None
     else:
         raise ValueError(f"unknown action: {action}")
 
-    _finalize_if_done(result, token)
+    _finalize_if_done(result, token, checkpointer)
 
 
 if __name__ == "__main__":

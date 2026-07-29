@@ -40,6 +40,7 @@ class TaskStatusResponse(BaseModel):
     cost_used_usd: float
     awaiting_approval: Optional[dict]
     done: bool
+    pr_url: Optional[str]
 
 
 def configure(settings: Settings, sqs_client=None) -> None:
@@ -86,12 +87,14 @@ def get_task(task_id: str):
     for task in snapshot.tasks:
         if task.interrupts:
             awaiting_approval = task.interrupts[0].value
+    pr_url = checkpointer.get_pr_url(task_id) if hasattr(checkpointer, "get_pr_url") else None
     return TaskStatusResponse(
         task_id=task_id,
         files=snapshot.values.get("files", {}),
         cost_used_usd=snapshot.values.get("cost_used_usd", 0.0),
         awaiting_approval=awaiting_approval,
         done=not snapshot.next,
+        pr_url=pr_url,
     )
 
 
