@@ -5,8 +5,10 @@ __pycache__/
 .pytest_cache/
 runs/
 .claude/
+.superpowers/
 docs/
 infra/.terraform/
 infra/*.tfstate*
 infra/.terraform.lock.hcl
 infra/consumer_handler.zip
+.DS_Store

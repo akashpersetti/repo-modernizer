@@ -9,10 +9,6 @@ request — end to end, deployed on AWS.
 ![demo](./demo.gif)
 <!-- Uncomment the line above once docs/demo.gif is recorded (see docs/demo_script.md locally). -->
 
-**Resume line:** *"Built a durable long-horizon coding agent on AWS with per-step DynamoDB
-checkpointing, human-in-the-loop approval gates, provider failover, and cost governance; resumes
-mid-migration after failure and opens auto-generated PRs."*
-
 **Live dashboard:** https://repo-modernizer.akashpersetti.com
 **Live API:** https://6yncgq73gk.execute-api.us-east-1.amazonaws.com
 
@@ -184,4 +180,19 @@ Deliberately no NAT Gateway, no ALB, no EC2, no standing Fargate service — eve
 scales to zero when idle. The only things that ever bill are: Bedrock tokens (capped per-task),
 a few seconds of Fargate compute per migration, and pennies of S3/DynamoDB/CloudWatch storage.
 AWS Budgets tripwires at $5 (alert) and $10 (ceiling) as a backstop in case something misbehaves.
+
+## Future hooks
+
+Known gaps, found via real live migrations against real target repos rather than assumed upfront:
+
+- **Nested dependency manifests.** Target-repo dependency install (`app/services/dependencies.py`)
+  only looks at the repo root for `requirements.txt`/`pyproject.toml`/`package.json`. A src-layout
+  repo whose real manifest lives one level down (e.g. `src/requirements.txt`) falls through to
+  installing the repo root itself as a package, which can fail for unrelated reasons (a
+  `requires-python` constraint incompatible with the worker's own Python, in one observed case).
+  Confirmed live against a real target repo; not yet fixed — root-only detection was an explicit
+  scope call, not an oversight.
+- **Other package managers/languages.** Only pip (`requirements.txt`/`pyproject.toml`) and npm
+  (`package.json`) are detected and installed. Go, Ruby, yarn/pnpm, and poetry-specific lockfile
+  resolution are all out of scope for now.
 See `RepoModernizer-Spec.md` §8b for the full design reasoning.
