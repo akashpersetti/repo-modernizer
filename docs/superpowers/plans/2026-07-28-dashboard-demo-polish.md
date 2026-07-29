@@ -654,7 +654,7 @@ git commit -m "feat: task status page — polling, interrupt/approve UI, PR link
 **Interfaces:**
 - Produces: `aws_s3_bucket.frontend`, `aws_cloudfront_distribution.frontend`, outputs `dashboard_url`, `dashboard_bucket_name`, `dashboard_distribution_id`.
 
-- [ ] **Step 1: Write frontend.tf**
+- [x] **Step 1: Write frontend.tf**
 
 ```hcl
 # infra/frontend.tf
@@ -777,17 +777,19 @@ output "dashboard_distribution_id" {
 }
 ```
 
-- [ ] **Step 2: Plan and apply**
+- [x] **Step 2: Plan and apply**
 
 Run: `cd infra && terraform plan -var="budget_alert_email=<your-email>"` — review: S3 bucket, OAC, CloudFront distribution, bucket policy, three outputs, nothing touching existing resources.
 Run: `terraform apply -var="budget_alert_email=<your-email>"` (CloudFront distributions take 5-15 minutes to fully deploy — the apply itself returns once creation is accepted, not once it's globally propagated).
 
-- [ ] **Step 3: Verify**
+Note: the unscoped plan also surfaced pre-existing drift on `aws_ecs_task_definition.worker`/`aws_lambda_function.api` (local `api_image_tag`/`worker_image_tag` vars default to `:initial`, live state has the real deployed git-SHA tag from CI) — unrelated to this task. Applied with `-target` scoped to only the 6 frontend resources to avoid touching those.
+
+- [x] **Step 3: Verify**
 
 Run: `aws s3api get-bucket-policy-status --bucket $(terraform output -raw dashboard_bucket_name) --query 'PolicyStatus.IsPublic'` → `false` (bucket itself is not public — only reachable via CloudFront).
 Run: `aws cloudfront get-distribution --id $(terraform output -raw dashboard_distribution_id) --query 'Distribution.Status'` → eventually `"Deployed"` (may still say `"InProgress"` right after apply — that's expected, wait a few minutes before Task 7's live check).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add infra/frontend.tf
