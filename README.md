@@ -8,7 +8,7 @@ after every change, pauses for human approval on risky diffs, survives crashes m
 fails over across model providers, enforces a hard cost cap, and opens a real pull request —
 end to end, deployed on AWS.
 
-**Live dashboard:** https://d12ztzghnd3aa9.cloudfront.net
+**Live dashboard:** https://repo-modernizer.akashpersetti.com
 **Live API:** https://6yncgq73gk.execute-api.us-east-1.amazonaws.com
 
 ## What this proves

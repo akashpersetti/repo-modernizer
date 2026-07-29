@@ -2,7 +2,7 @@
 
 Recording checklist for the demo GIF/video (~90 seconds).
 
-1. Open the live dashboard: https://d12ztzghnd3aa9.cloudfront.net
+1. Open the live dashboard: https://repo-modernizer.akashpersetti.com
 2. Fill the form:
    - Repo URL: `https://github.com/akashpersetti/repomodernizer-demo-target`
    - Goal: `Migrate this Flask app to FastAPI with async route handlers.`

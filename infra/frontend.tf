@@ -49,6 +49,7 @@ resource "aws_cloudfront_distribution" "frontend" {
   enabled             = true
   default_root_object = "index.html"
   comment              = "repomod-frontend"
+  aliases              = ["repo-modernizer.akashpersetti.com"]
 
   origin {
     domain_name              = aws_s3_bucket.frontend.bucket_regional_domain_name
@@ -82,7 +83,25 @@ resource "aws_cloudfront_distribution" "frontend" {
   }
 
   viewer_certificate {
-    cloudfront_default_certificate = true
+    acm_certificate_arn      = "arn:aws:acm:us-east-1:914697327092:certificate/4a4d9dd9-f9d0-474d-bbf5-2ed4d4ad7ef3"
+    ssl_support_method       = "sni-only"
+    minimum_protocol_version = "TLSv1.2_2021"
+  }
+}
+
+data "aws_route53_zone" "akashpersetti" {
+  name = "akashpersetti.com."
+}
+
+resource "aws_route53_record" "dashboard" {
+  zone_id = data.aws_route53_zone.akashpersetti.zone_id
+  name    = "repo-modernizer.akashpersetti.com"
+  type    = "A"
+
+  alias {
+    name                   = aws_cloudfront_distribution.frontend.domain_name
+    zone_id                = aws_cloudfront_distribution.frontend.hosted_zone_id
+    evaluate_target_health = false
   }
 }
 
@@ -106,6 +125,10 @@ resource "aws_s3_bucket_policy" "frontend" {
 }
 
 output "dashboard_url" {
+  value = "https://repo-modernizer.akashpersetti.com"
+}
+
+output "dashboard_cloudfront_url" {
   value = "https://${aws_cloudfront_distribution.frontend.domain_name}"
 }
 

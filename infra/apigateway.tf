@@ -3,7 +3,10 @@ resource "aws_apigatewayv2_api" "main" {
   protocol_type = "HTTP"
 
   cors_configuration {
-    allow_origins = ["https://${aws_cloudfront_distribution.frontend.domain_name}"]
+    allow_origins = [
+      "https://${aws_cloudfront_distribution.frontend.domain_name}",
+      "https://repo-modernizer.akashpersetti.com",
+    ]
     allow_methods = ["GET", "POST", "OPTIONS"]
     allow_headers = ["content-type"]
   }
