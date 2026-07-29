@@ -199,7 +199,7 @@ git commit -m "feat: surface PR URL on task status — stored as a sibling Dynam
 **Interfaces:**
 - Produces: `createTask`, `getTaskStatus`, `approveTask` (in `lib/api.ts`), the `TaskStatus`/`FileStatus` types every later page consumes.
 
-- [ ] **Step 1: Write the scaffolding**
+- [x] **Step 1: Write the scaffolding**
 
 ```json
 // frontend/package.json
@@ -380,12 +380,12 @@ const eslintConfig = [...compat.extends("next/core-web-vitals", "next/typescript
 export default eslintConfig;
 ```
 
-- [ ] **Step 2: Install and verify the toolchain resolves**
+- [x] **Step 2: Install and verify the toolchain resolves**
 
 Run: `cd frontend && npm install`
 Verify: exits 0, `node_modules/` populated, no peer-dependency errors printed as failures (warnings are fine).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/package.json frontend/package-lock.json frontend/next.config.ts frontend/tsconfig.json \
