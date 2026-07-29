@@ -78,6 +78,14 @@ data "aws_iam_policy_document" "github_deploy_perms" {
     actions   = ["iam:PassRole"]
     resources = ["*"]
   }
+  statement {
+    actions   = ["s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
+    resources = ["arn:aws:s3:::repomodernizer-frontend-*", "arn:aws:s3:::repomodernizer-frontend-*/*"]
+  }
+  statement {
+    actions   = ["cloudfront:CreateInvalidation"]
+    resources = ["*"]
+  }
 }
 
 resource "aws_iam_role_policy" "github_deploy_perms" {
