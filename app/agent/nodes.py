@@ -9,6 +9,7 @@ from langgraph.types import interrupt
 from app.agent.guardrails import validate_diff
 from app.agent.providers import ProviderError
 from app.agent.state import GraphState
+from app.services.dependencies import detect_manifest, install_dependencies
 from app.services.diffs import apply_diff, make_diff
 from app.services.tests_runner import run_tests
 
@@ -74,6 +75,33 @@ def ingest_node(state: GraphState, deps: NodeDeps) -> dict:
         "cursor": 0,
         "cost_used_usd": 0.0,
         "trace": [{"node": "ingest", "note": "workspace initialized"}],
+    }
+
+
+def install_deps_node(state: GraphState, deps: NodeDeps) -> dict:
+    workspace = Path(state["repo_path"])
+    manifest = detect_manifest(workspace)
+
+    if manifest is None:
+        return {
+            "venv_bin": None,
+            "dependency_install_failed": False,
+            "trace": state["trace"] + [{"node": "install_deps", "note": "no dependency manifest found, skipping install"}],
+        }
+
+    result = install_dependencies(workspace, manifest)
+
+    if not result.ok:
+        return {
+            "venv_bin": None,
+            "dependency_install_failed": True,
+            "trace": state["trace"] + [{"node": "install_deps", "note": f"install failed: {result.output}"}],
+        }
+
+    return {
+        "venv_bin": str(result.venv_bin),
+        "dependency_install_failed": False,
+        "trace": state["trace"] + [{"node": "install_deps", "note": f"installed dependencies via {manifest.kind}"}],
     }
 
 
@@ -205,7 +233,7 @@ def migrate_file_node(state: GraphState, deps: NodeDeps) -> dict:
     except RuntimeError as exc:
         return _retry_or_fail(state, file_result, path, f"diff apply failed: {exc}", deps)
 
-    result = run_tests(workspace, state["test_command"])
+    result = run_tests(workspace, state["test_command"], state.get("venv_bin"))
     if not result.passed:
         return _retry_or_fail(state, file_result, path, f"tests failed: {result.output[-500:]}", deps)
 
@@ -216,6 +244,11 @@ def migrate_file_node(state: GraphState, deps: NodeDeps) -> dict:
 def finalize_node(state: GraphState, deps: NodeDeps) -> dict:
     run_dir = Path(state["repo_path"]).parent
     (run_dir / "trace.json").write_text(json.dumps(state["trace"], indent=2))
+    if state.get("dependency_install_failed"):
+        (run_dir / "summary.md").write_text(
+            "Dependency installation failed -- task stopped before any files were migrated.\n"
+        )
+        return {"trace": state["trace"] + [{"node": "finalize", "note": "run complete (dependency install failed)"}]}
     lines = ["| File | Status | Tokens | Cost ($) |", "|---|---|---|---|"]
     for path, result in state["files"].items():
         lines.append(f"| {path} | {result['status']} | {result['tokens']} | {result['cost_usd']:.4f} |")
