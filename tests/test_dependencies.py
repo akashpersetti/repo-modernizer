@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from app.services.dependencies import detect_manifest, Manifest, _install_npm
+from app.services.dependencies import detect_manifest, Manifest, install_dependencies, _install_npm
 
 
 def test_detect_manifest_prefers_requirements_txt_over_pyproject(tmp_path):
@@ -37,6 +37,53 @@ def test_detect_manifest_falls_back_to_package_json(tmp_path):
 
 def test_detect_manifest_returns_none_when_nothing_present(tmp_path):
     assert detect_manifest(tmp_path) is None
+
+
+def test_install_dependencies_pip_requirements_txt_succeeds(tmp_path):
+    (tmp_path / "requirements.txt").write_text("iniconfig==2.0.0\n")
+    manifest = Manifest(kind="pip", path=tmp_path / "requirements.txt")
+
+    result = install_dependencies(tmp_path, manifest)
+
+    assert result.ok is True
+    assert result.venv_bin is not None
+    check = subprocess.run(
+        [str(result.venv_bin / "python"), "-c", "import iniconfig; print(iniconfig.__name__)"],
+        capture_output=True, text=True,
+    )
+    assert check.returncode == 0
+    assert check.stdout.strip() == "iniconfig"
+
+
+def test_install_dependencies_pip_requirements_txt_reports_failure(tmp_path):
+    (tmp_path / "requirements.txt").write_text("this-package-definitely-does-not-exist-xyz123==0.0.0\n")
+    manifest = Manifest(kind="pip", path=tmp_path / "requirements.txt")
+
+    result = install_dependencies(tmp_path, manifest)
+
+    assert result.ok is False
+    assert result.venv_bin is None
+
+
+def test_install_dependencies_pip_pyproject_calls_pip_install_dot(tmp_path, monkeypatch):
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "0.0.1"\n')
+    manifest = Manifest(kind="pip", path=tmp_path / "pyproject.toml")
+
+    captured_args = []
+    real_run = subprocess.run
+
+    def fake_run(args, **kwargs):
+        captured_args.append(args)
+        if args[0] == str((tmp_path / ".repomod-venv" / "bin" / "pip")):
+            return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+        return real_run(args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    install_dependencies(tmp_path, manifest)
+
+    pip_call = next(a for a in captured_args if str(tmp_path / ".repomod-venv" / "bin" / "pip") in a[0])
+    assert pip_call == [str(tmp_path / ".repomod-venv" / "bin" / "pip"), "install", str(tmp_path)]
 
 
 @pytest.mark.skipif(
