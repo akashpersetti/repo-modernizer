@@ -404,7 +404,7 @@ git commit -m "feat: Next.js static-export scaffolding, Tailwind v4, typed API c
 **Interfaces:**
 - Consumes: `createTask` from `frontend/lib/api.ts` (Task 2).
 
-- [ ] **Step 1: Write the page**
+- [x] **Step 1: Write the page**
 
 ```tsx
 // frontend/app/page.tsx
@@ -481,12 +481,12 @@ export default function HomePage() {
 }
 ```
 
-- [ ] **Step 2: Build to verify it compiles**
+- [x] **Step 2: Build to verify it compiles**
 
 Run: `cd frontend && npm run build`
 Expected: succeeds, produces `frontend/out/index.html`. (No dev server smoke test yet — Task 4 needs to exist first for a meaningful click-through; Task 7 is the first real end-to-end check.)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/app/page.tsx
