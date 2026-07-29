@@ -30,3 +30,5 @@ class GraphState(TypedDict):
     branch: str
     base_branch: str
     file_extensions: list[str]
+    venv_bin: Optional[str]
+    dependency_install_failed: bool

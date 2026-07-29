@@ -3,8 +3,12 @@ from functools import partial
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 
-from app.agent.nodes import NodeDeps, finalize_node, ingest_node, migrate_file_node, plan_node
+from app.agent.nodes import NodeDeps, finalize_node, ingest_node, install_deps_node, migrate_file_node, plan_node
 from app.agent.state import GraphState
+
+
+def route_after_install(state: GraphState) -> str:
+    return "finalize" if state["dependency_install_failed"] else "plan"
 
 
 def route_after_migrate(state: GraphState) -> str:
@@ -16,12 +20,17 @@ def route_after_migrate(state: GraphState) -> str:
 def build_graph(deps: NodeDeps, checkpointer=None):
     graph = StateGraph(GraphState)
     graph.add_node("ingest", partial(ingest_node, deps=deps))
+    graph.add_node("install_deps", partial(install_deps_node, deps=deps))
     graph.add_node("plan", partial(plan_node, deps=deps))
     graph.add_node("migrate_file", partial(migrate_file_node, deps=deps))
     graph.add_node("finalize", partial(finalize_node, deps=deps))
 
     graph.set_entry_point("ingest")
-    graph.add_edge("ingest", "plan")
+    graph.add_edge("ingest", "install_deps")
+    graph.add_conditional_edges("install_deps", route_after_install, {
+        "plan": "plan",
+        "finalize": "finalize",
+    })
     graph.add_conditional_edges("plan", route_after_migrate, {
         "migrate_file": "migrate_file",
         "finalize": "finalize",

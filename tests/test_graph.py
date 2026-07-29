@@ -44,6 +44,11 @@ def _initial_state(repo_path: str, goal: str, test_command: str) -> dict:
         "cost_used_usd": 0.0,
         "trace": [],
         "file_extensions": [".py"],
+        "venv_bin": None,
+        "dependency_install_failed": False,
+        "repo_url": "https://github.com/example/repo",
+        "branch": "main",
+        "base_branch": "main",
     }
 
 
@@ -184,3 +189,60 @@ def test_ingest_node_does_not_crash_on_already_clean_repo(tmp_path):
     result = ingest_node(state, deps)  # must not raise
 
     assert result["trace"][0]["node"] == "ingest"
+
+
+def test_graph_skips_plan_and_migrate_when_no_manifest(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "app.py").write_text("x = 1\n")
+
+    fake = FakeProviderRouter([
+        json.dumps([{"path": "app.py", "rationale": "trivial change", "risk_score": 0.1}]),
+        "x = 2\n",
+    ])
+    deps = NodeDeps(
+        providers=fake,
+        budget=BudgetTracker(cap_usd=10.0),
+        forbidden_paths=[],
+        max_diff_lines=400,
+        risk_threshold=0.6,
+        max_retries=2,
+        estimated_cost_per_file=0.01,
+    )
+    graph = build_graph(deps)
+    config = {"configurable": {"thread_id": "no-manifest"}}
+
+    result = graph.invoke(_initial_state(str(repo), "bump x", "true"), config=config)
+
+    assert result["dependency_install_failed"] is False
+    assert result["files"]["app.py"]["status"] == "migrated"
+    assert (repo / "app.py").read_text() == "x = 2\n"
+
+
+def test_graph_routes_to_finalize_when_install_fails(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "app.py").write_text("x = 1\n")
+    (repo / "requirements.txt").write_text("invalid-package-name-that-does-not-exist==9.9.9\n")
+
+    fake = FakeProviderRouter([
+        json.dumps([{"path": "app.py", "rationale": "trivial change", "risk_score": 0.1}]),
+        "x = 2\n",
+    ])
+    deps = NodeDeps(
+        providers=fake,
+        budget=BudgetTracker(cap_usd=10.0),
+        forbidden_paths=[],
+        max_diff_lines=400,
+        risk_threshold=0.6,
+        max_retries=2,
+        estimated_cost_per_file=0.01,
+    )
+    graph = build_graph(deps)
+    config = {"configurable": {"thread_id": "install-fails"}}
+
+    result = graph.invoke(_initial_state(str(repo), "bump x", "true"), config=config)
+
+    assert result["dependency_install_failed"] is True
+    assert len(result["files"]) == 0
+    assert result["plan"] == []

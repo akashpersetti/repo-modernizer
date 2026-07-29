@@ -3,7 +3,7 @@ from pathlib import Path
 
 from app.agent.budget import BudgetTracker
 from app.agent.graph import build_graph
-from app.agent.nodes import NodeDeps, _is_test_file, _is_vendor_dir, _strip_code_fence
+from app.agent.nodes import NodeDeps, install_deps_node, _is_test_file, _is_vendor_dir, _strip_code_fence
 
 
 def test_strip_code_fence_removes_json_fence():
@@ -90,6 +90,11 @@ def test_plan_node_respects_configured_file_extensions(tmp_path):
         "task_id": "ext-test", "repo_path": str(repo), "goal": "g", "test_command": "true",
         "plan": [], "files": {}, "cursor": 0, "cost_used_usd": 0.0, "trace": [],
         "file_extensions": [".js", ".jsx"],
+        "venv_bin": None,
+        "dependency_install_failed": False,
+        "repo_url": "https://github.com/example/repo",
+        "branch": "main",
+        "base_branch": "main",
     }
 
     graph.invoke(state, config=config)
@@ -125,9 +130,79 @@ def test_migrate_file_node_applies_diff_when_source_lacks_trailing_newline(tmp_p
         "task_id": "no-newline-test", "repo_path": str(repo), "goal": "g", "test_command": "true",
         "plan": [], "files": {}, "cursor": 0, "cost_used_usd": 0.0, "trace": [],
         "file_extensions": [".js"],
+        "venv_bin": None,
+        "dependency_install_failed": False,
+        "repo_url": "https://github.com/example/repo",
+        "branch": "main",
+        "base_branch": "main",
     }
 
     result = graph.invoke(state, config=config)
 
     assert result["files"]["app.js"]["status"] == "migrated"
     assert (repo / "app.js").read_text() == "console.log(2);\n"
+
+
+def test_install_deps_node_skips_when_no_manifest(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    deps = NodeDeps(
+        providers=None, budget=BudgetTracker(cap_usd=10.0), forbidden_paths=[],
+        max_diff_lines=400, risk_threshold=0.6, max_retries=2, estimated_cost_per_file=0.01,
+    )
+    state = {
+        "repo_path": str(repo),
+        "trace": [{"node": "ingest", "note": "workspace initialized"}],
+    }
+
+    result = install_deps_node(state, deps)
+
+    assert result["dependency_install_failed"] is False
+    assert result["venv_bin"] is None
+    assert len(result["trace"]) == 2
+    assert result["trace"][1]["node"] == "install_deps"
+    assert result["trace"][1]["note"] == "no dependency manifest found, skipping install"
+
+
+def test_install_deps_node_reports_failure(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "requirements.txt").write_text("invalid-package-name-that-does-not-exist==9.9.9\n")
+
+    deps = NodeDeps(
+        providers=None, budget=BudgetTracker(cap_usd=10.0), forbidden_paths=[],
+        max_diff_lines=400, risk_threshold=0.6, max_retries=2, estimated_cost_per_file=0.01,
+    )
+    state = {
+        "repo_path": str(repo),
+        "trace": [{"node": "ingest", "note": "workspace initialized"}],
+    }
+
+    result = install_deps_node(state, deps)
+
+    assert result["dependency_install_failed"] is True
+    assert result["venv_bin"] is None
+    assert len(result["trace"]) == 2
+    assert result["trace"][1]["node"] == "install_deps"
+    assert "install failed:" in result["trace"][1]["note"]
+
+
+def test_finalize_node_reports_dependency_install_failure(tmp_path):
+    from app.agent.nodes import finalize_node
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    deps = NodeDeps(
+        providers=None, budget=BudgetTracker(cap_usd=10.0), forbidden_paths=[],
+        max_diff_lines=400, risk_threshold=0.6, max_retries=2, estimated_cost_per_file=0.01,
+    )
+    state = {
+        "repo_path": str(repo), "trace": [], "files": {}, "cost_used_usd": 0.0,
+        "dependency_install_failed": True,
+    }
+
+    finalize_node(state, deps)
+
+    summary = (tmp_path / "summary.md").read_text()
+    assert "Dependency installation failed" in summary
