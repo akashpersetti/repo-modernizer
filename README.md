@@ -1,7 +1,5 @@
 # RepoModernizer
 
-<!-- ![demo](docs/demo.gif) -- restored once the demo GIF is recorded (tracked as a known open item) -->
-
 Autonomous repository modernization agent. Give it a GitHub repo and a goal ("Flask → FastAPI"),
 and it plans a file-by-file migration, rewrites each file, runs the target repo's own test suite
 after every change, pauses for human approval on risky diffs, survives crashes mid-migration,
@@ -43,8 +41,6 @@ API Gateway → Lambda (FastAPI + Mangum) — validates, enqueues to SQS, reads 
                     │
         DynamoDB (checkpoints, survives across separate task runs)
 ```
-
-Full design history: [`docs/superpowers/specs/`](docs/superpowers/specs/) and [`docs/superpowers/plans/`](docs/superpowers/plans/) — every sub-project's design doc and implementation plan, including the real bugs found and fixed at each stage.
 
 ## Run it yourself
 
