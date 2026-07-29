@@ -65,3 +65,13 @@ def test_put_and_get_pr_url_roundtrip():
     assert _checkpointer.get_pr_url(thread_id) is None
     _checkpointer.put_pr_url(thread_id, "https://github.com/x/y/pull/1")
     assert _checkpointer.get_pr_url(thread_id) == "https://github.com/x/y/pull/1"
+
+
+def test_try_claim_is_atomic_only_first_caller_succeeds():
+    # The actual atomicity guarantee behind entrypoint.py's duplicate-approve guard:
+    # get_state-then-invoke is check-then-act and can race, but this conditional
+    # put cannot -- DynamoDB rejects the second PutItem outright.
+    thread_id = f"test-{uuid.uuid4().hex[:8]}"
+    assert _checkpointer.try_claim(thread_id, "resume:abc") is True
+    assert _checkpointer.try_claim(thread_id, "resume:abc") is False
+    assert _checkpointer.try_claim(thread_id, "resume:xyz") is True

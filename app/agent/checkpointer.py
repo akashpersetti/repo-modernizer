@@ -3,6 +3,7 @@ from typing import Any, Iterator, Optional
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from botocore.exceptions import ClientError
 from langgraph.checkpoint.base import (
     BaseCheckpointSaver,
     ChannelVersions,
@@ -106,3 +107,21 @@ class DynamoDBCheckpointer(BaseCheckpointSaver):
         resp = self._table.get_item(Key={"PK": f"TASK#{task_id}", "SK": "PR_URL"})
         item = resp.get("Item")
         return item["url"] if item else None
+
+    def try_claim(self, task_id: str, key: str) -> bool:
+        """Atomically claim a one-time action (e.g. resolving one specific pending
+        interrupt). True if this call is the first to claim it; False if another
+        concurrent call already did. DynamoDB's conditional put is the only part
+        of this whole system with real atomicity -- everything else here (the
+        get_state-then-invoke check in entrypoint.py) is check-then-act and can
+        still race if two callers land within the same instant."""
+        try:
+            self._table.put_item(
+                Item={"PK": f"TASK#{task_id}", "SK": f"CLAIM#{key}", "ttl": int(time.time()) + _TTL_SECONDS},
+                ConditionExpression="attribute_not_exists(PK)",
+            )
+            return True
+        except ClientError as exc:
+            if exc.response["Error"]["Code"] == "ConditionalCheckFailedException":
+                return False
+            raise

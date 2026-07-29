@@ -103,7 +103,20 @@ def run(checkpointer_factory=None, deps_factory=None, github_token=None) -> None
         # live: a single approve click produced 6-9 identical commits on the PR.
         snapshot = graph.get_state(config)
         has_pending_interrupt = any(t.interrupts for t in snapshot.tasks)
-        if has_pending_interrupt:
+        # get_state-then-invoke is check-then-act, not atomic -- two callers landing
+        # within the same instant (a genuinely concurrent duplicate, not just a
+        # sequential re-click) can both read has_pending_interrupt=True before
+        # either has resumed. try_claim's conditional put is the actual atomicity:
+        # only the first caller to claim this specific checkpoint_id proceeds.
+        # Found live: the has_pending_interrupt check alone cut duplicate commits
+        # from 6-9 down to 1 extra, not zero, for two approve calls sent ~1s apart.
+        checkpoint_id = snapshot.config.get("configurable", {}).get("checkpoint_id", "")
+        claimed = (
+            checkpointer.try_claim(task_id, f"resume:{checkpoint_id}")
+            if hasattr(checkpointer, "try_claim")
+            else True
+        )
+        if has_pending_interrupt and claimed:
             result = graph.invoke(
                 Command(resume={"decision": os.environ["DECISION"], "note": os.environ.get("NOTE", "")}),
                 config=config,

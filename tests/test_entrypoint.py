@@ -11,19 +11,28 @@ from app.worker import entrypoint
 
 
 class _MemorySaverWithPrUrl(MemorySaver):
-    """MemorySaver lacks put_pr_url/get_pr_url -- real DynamoDBCheckpointer has both.
-    Tests exercising the finalize-idempotency guard need a checkpointer that
-    actually supports it, or they can't tell the guard apart from a no-op."""
+    """MemorySaver lacks put_pr_url/get_pr_url/try_claim -- real DynamoDBCheckpointer
+    has all three. Tests exercising the finalize-idempotency or duplicate-resume
+    guards need a checkpointer that actually supports them, or they can't tell
+    the guard apart from a no-op."""
 
     def __init__(self):
         super().__init__()
         self._pr_urls = {}
+        self._claims = set()
 
     def put_pr_url(self, task_id, url):
         self._pr_urls[task_id] = url
 
     def get_pr_url(self, task_id):
         return self._pr_urls.get(task_id)
+
+    def try_claim(self, task_id, key):
+        claim = (task_id, key)
+        if claim in self._claims:
+            return False
+        self._claims.add(claim)
+        return True
 
 
 class FakeProviderRouter:
