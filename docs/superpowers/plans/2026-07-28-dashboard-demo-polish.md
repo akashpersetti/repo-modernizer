@@ -903,7 +903,7 @@ Run: `jq -r .pr_url /tmp/dash_status.json` → a real `https://github.com/akashp
 
 Result: `pr_url` = `https://github.com/akashpersetti/repomodernizer-demo-target/pull/4`, confirmed also via `gh pr view 4` (open, correct title/branch, `webapp.py` Flask→FastAPI diff). Also found + fixed a real backend gap during this step: OPTIONS preflight was 405ing (see Task 6's Step 3 note) — fixed and reverified live before this run.
 
-- [x] **Step 5: Actually open the dashboard in a real browser once**
+- [ ] **Step 5: Actually open the dashboard in a real browser once**
 
 Navigate to the `dashboard_url` output, submit the same form, watch it through — the CLI steps above prove the API contract works; this step confirms the UI itself renders and wires up correctly (loading states, the diff `<pre>` block, button disable states) — something no curl script can verify. Note anything visually broken and fix before moving on.
 

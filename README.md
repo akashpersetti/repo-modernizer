@@ -1,6 +1,6 @@
 # RepoModernizer
 
-![demo](docs/demo.gif)
+<!-- ![demo](docs/demo.gif) -- restored once the demo GIF is recorded (tracked as a known open item) -->
 
 Autonomous repository modernization agent. Give it a GitHub repo and a goal ("Flask → FastAPI"),
 and it plans a file-by-file migration, rewrites each file, runs the target repo's own test suite
@@ -85,7 +85,9 @@ RUN_LIVE_GITHUB_TESTS=1 DEMO_REPO_URL=<url> .venv/bin/python -m pytest tests/tes
 ```bash
 cd frontend
 npm install
-npm run dev   # http://localhost:3000, talks to the real deployed API by default
+NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev   # http://localhost:3000, talks to a local backend (see "Run the full local service" above) —
+                                                          # the deployed API's CORS allow_origins only includes the CloudFront domain, so
+                                                          # localhost:3000 can't call it cross-origin
 ```
 
 ## Cost

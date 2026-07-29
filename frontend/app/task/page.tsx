@@ -14,19 +14,26 @@ function TaskView() {
   useEffect(() => {
     if (!taskId) return;
     let cancelled = false;
+    const timer: { id: ReturnType<typeof setInterval> | undefined } = { id: undefined };
     async function poll() {
       try {
         const s = await getTaskStatus(taskId);
-        if (!cancelled) setStatus(s);
+        if (!cancelled) {
+          setStatus(s);
+          setError(null);
+          if (s.done && timer.id !== undefined) {
+            clearInterval(timer.id);
+          }
+        }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
       }
     }
     poll();
-    const interval = setInterval(poll, 4000);
+    timer.id = setInterval(poll, 4000);
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      if (timer.id !== undefined) clearInterval(timer.id);
     };
   }, [taskId]);
 
@@ -35,18 +42,27 @@ function TaskView() {
     setActing(true);
     try {
       await approveTask(taskId, status.awaiting_approval.path, decision);
+      setStatus((prev) => (prev ? { ...prev, awaiting_approval: null } : prev));
+    } catch (err) {
+      setError(`Approve action failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setActing(false);
     }
   }
 
   if (!taskId) return <p className="p-8">No task id in URL.</p>;
-  if (error) return <p className="p-8 text-red-600">{error}</p>;
+  if (error && !status) return <p className="p-8 text-red-600">{error}</p>;
   if (!status) return <p className="p-8">Loading...</p>;
 
   return (
     <main className="max-w-3xl mx-auto py-12 px-4 space-y-6">
       <h1 className="text-xl font-semibold">Task {taskId}</h1>
+
+      {error && (
+        <div className="border border-red-400 bg-red-50 text-red-700 rounded p-3 text-sm">
+          {error}
+        </div>
+      )}
 
       {status.awaiting_approval && (
         <div className="border border-yellow-400 bg-yellow-50 rounded p-4 space-y-3">
