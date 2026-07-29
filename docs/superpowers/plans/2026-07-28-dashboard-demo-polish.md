@@ -920,7 +920,7 @@ Navigate to the `dashboard_url` output, submit the same form, watch it through �
 **Interfaces:**
 - Modifies: `github_deploy_perms` gains S3 write + CloudFront invalidation permissions for the frontend bucket/distribution. `deploy.yml` gains a `frontend` job.
 
-- [ ] **Step 1: Extend the IAM policy**
+- [x] **Step 1: Extend the IAM policy**
 
 ```hcl
 # infra/github_oidc.tf — add these two statements inside the existing
@@ -935,12 +935,14 @@ Navigate to the `dashboard_url` output, submit the same form, watch it through �
   }
 ```
 
-- [ ] **Step 2: Plan and apply**
+- [x] **Step 2: Plan and apply**
 
 Run: `cd infra && terraform plan -var="budget_alert_email=<your-email>"` — should show only `aws_iam_role_policy.github_deploy_perms` changing in place.
 Run: `terraform apply -var="budget_alert_email=<your-email>"`
 
-- [ ] **Step 3: Add the frontend job to deploy.yml**
+Note: same pre-existing image-tag drift as Tasks 5/6 present in the unscoped plan (by this point already resolved live by the deploy that landed after Task 6, so drift had actually cleared — applied with `-target=aws_iam_role_policy.github_deploy_perms` anyway to stay consistent/minimal). Verified live via `aws iam get-role-policy`.
+
+- [x] **Step 3: Add the frontend job to deploy.yml**
 
 ```yaml
 # .github/workflows/deploy.yml — add this job after the existing `deploy` job
@@ -974,11 +976,13 @@ Run: `terraform apply -var="budget_alert_email=<your-email>"`
       - run: aws cloudfront create-invalidation --distribution-id ${{ steps.tf.outputs.dist_id }} --paths "/*"
 ```
 
-- [ ] **Step 4: Verify with a real merge**
+- [x] **Step 4: Verify with a real merge**
 
 Commit this task's changes, push a branch, open a real PR against `main` on `akashpersetti/repo-modernizer`, confirm `test`/`plan` pass in the Actions tab, merge, confirm `deploy` then `frontend` both run and succeed. Then re-run Task 7 Step 2's curl checks against the dashboard URL to confirm the CI-deployed build serves correctly.
 
-- [ ] **Step 5: Commit**
+Result: PR #2 (`frontend-cicd-verify` → `main`), `test`+`plan` both SUCCESS (run 30465831214), merged (17bd8fb). Post-merge run 30466350809: `test` (19s) + `deploy` (2m17s) + `frontend` (46s, first real run of this job — npm build, s3 sync, cloudfront invalidation) all green. Re-verified `/` → 200 + "RepoModernizer" content, `/task?id=anything` → 200.
+
+- [x] **Step 5: Commit**
 
 ```bash
 git add infra/github_oidc.tf .github/workflows/deploy.yml
