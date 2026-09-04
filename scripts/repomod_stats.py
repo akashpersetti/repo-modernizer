@@ -56,7 +56,12 @@ def main() -> None:
     completed = [s for s in summaries if s.get("status") == "done"]
     migrated = [s for s in completed if int(s.get("files_failed", 0)) == 0 and int(s.get("files_total", 0)) > 0]
     resumed = [s for s in summaries if int(s.get("resume_invocations", 0)) > 0]
-    resumed_and_migrated = [s for s in resumed if s in migrated]
+    # "Resume succeeded" means the crash-recovery mechanism itself worked -- the
+    # task reached a coherent terminal state after resuming, same as any other
+    # run would. Whether individual files separately failed to migrate (an LLM
+    # diff-quality issue, unrelated to crash recovery) is a different metric --
+    # see "migrated" above.
+    resumed_and_completed = [s for s in resumed if s in completed]
 
     total_approved = sum(int(s.get("files_approved", 0)) for s in summaries)
     total_rejected = sum(int(s.get("files_rejected", 0)) for s in summaries)
@@ -76,7 +81,7 @@ def main() -> None:
     print(f"Repos successfully migrated: {len(migrated)}")
     print(f"Resume attempts (post-crash): {len(resumed)}")
     if resumed:
-        print(f"Resume success rate: {len(resumed_and_migrated) / len(resumed):.0%}")
+        print(f"Resume success rate: {len(resumed_and_completed) / len(resumed):.0%}")
     else:
         print("Resume success rate: n/a (no resumes recorded)")
     print(f"Avg cost per completed run: ${avg_cost:.4f}")
