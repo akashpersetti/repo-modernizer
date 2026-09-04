@@ -255,4 +255,12 @@ def test_finalize_stores_pr_url_when_migration_completes(tmp_path, monkeypatch):
     monkeypatch.setattr(os, "environ", {**os.environ, **env})
     ep.run(checkpointer_factory=lambda: checkpointer, deps_factory=deps_factory, github_token="")
 
-    assert checkpointer.get_pr_url(task_id) == "https://github.com/x/y/pull/42"
+    try:
+        assert checkpointer.get_pr_url(task_id) == "https://github.com/x/y/pull/42"
+    finally:
+        # SUMMARY carries a 180-day TTL (real runs need it to survive long enough
+        # to be reported on) -- unlike CKPT/PR_URL's 14-day TTL, it won't
+        # self-clean before scripts/repomod_stats.py counts it as a real
+        # migration. This test talks to the real prod table by design (see
+        # _MemorySaverWithPrUrl's docstring above); clean up what it wrote.
+        checkpointer._table.delete_item(Key={"PK": f"TASK#{task_id}", "SK": "SUMMARY"})
