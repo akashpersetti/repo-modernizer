@@ -70,8 +70,11 @@ data "aws_iam_policy_document" "github_deploy_perms" {
   statement {
     # test_checkpointer.py round-trips real rows through the live checkpoints
     # table (no mocking) -- the test job needs the same access the API Lambda
-    # has, plus UpdateItem for put_run_summary/note_resume (ecs_task's access).
-    actions   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query", "dynamodb:UpdateItem"]
+    # has, plus UpdateItem for put_run_summary/note_resume (ecs_task's access),
+    # plus DeleteItem so test_finalize_stores_pr_url_when_migration_completes
+    # can clean up the SUMMARY row it writes (180-day TTL, doesn't self-expire
+    # like this test's other rows).
+    actions   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query", "dynamodb:UpdateItem", "dynamodb:DeleteItem"]
     resources = ["arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/repomod-checkpoints"]
   }
   statement {
