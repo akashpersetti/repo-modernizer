@@ -70,8 +70,8 @@ data "aws_iam_policy_document" "github_deploy_perms" {
   statement {
     # test_checkpointer.py round-trips real rows through the live checkpoints
     # table (no mocking) -- the test job needs the same access the API Lambda
-    # has to run in CI.
-    actions   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query"]
+    # has, plus UpdateItem for put_run_summary/note_resume (ecs_task's access).
+    actions   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query", "dynamodb:UpdateItem"]
     resources = ["arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/repomod-checkpoints"]
   }
   statement {
