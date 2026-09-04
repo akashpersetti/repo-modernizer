@@ -126,11 +126,23 @@ def run(checkpointer_factory=None, deps_factory=None, github_token=None) -> None
         else:
             result = snapshot.values
     elif action == "resume":
+        if hasattr(checkpointer, "note_resume"):
+            checkpointer.note_resume(task_id)
         result = graph.invoke(None, config=config)
     else:
         raise ValueError(f"unknown action: {action}")
 
     _finalize_if_done(result, token, checkpointer)
+
+    if hasattr(checkpointer, "put_run_summary"):
+        checkpointer.put_run_summary(
+            task_id=task_id,
+            repo_url=result.get("repo_url", ""),
+            goal=result.get("goal", ""),
+            status="awaiting_approval" if "__interrupt__" in result else "done",
+            cost_used_usd=result.get("cost_used_usd", 0.0),
+            file_statuses=[f["status"] for f in result.get("files", {}).values()],
+        )
 
 
 if __name__ == "__main__":

@@ -1,5 +1,7 @@
 import time
-from typing import Any, Iterator, Optional
+from collections import Counter
+from decimal import Decimal
+from typing import Any, Iterator, List, Optional
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -14,6 +16,10 @@ from langgraph.checkpoint.base import (
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 
 _TTL_SECONDS = 14 * 24 * 3600
+# SUMMARY items back the stats reported by scripts/repomod_stats.py, so they
+# outlive the checkpoint blobs themselves (14d) -- otherwise a task's own
+# summary can expire before anyone runs the report.
+_SUMMARY_TTL_SECONDS = 180 * 24 * 3600
 
 
 class DynamoDBCheckpointer(BaseCheckpointSaver):
@@ -125,3 +131,47 @@ class DynamoDBCheckpointer(BaseCheckpointSaver):
             if exc.response["Error"]["Code"] == "ConditionalCheckFailedException":
                 return False
             raise
+
+    def put_run_summary(
+        self, task_id: str, repo_url: str, goal: str, status: str,
+        cost_used_usd: float, file_statuses: List[str],
+    ) -> None:
+        """Upserts one queryable SK='SUMMARY' item per task, so stats can be read
+        without deserializing the LangGraph checkpoint blob. Called at the end of
+        every worker invocation (start/approve/resume), so it reflects the latest
+        state each time; started_at is set once and preserved across calls."""
+        counts = Counter(file_statuses)
+        now = Decimal(str(time.time()))
+        self._table.update_item(
+            Key={"PK": f"TASK#{task_id}", "SK": "SUMMARY"},
+            UpdateExpression=(
+                "SET repo_url = :repo_url, goal = :goal, #status = :status, "
+                "cost_used_usd = :cost, files_total = :total, "
+                "files_migrated = :migrated, files_failed = :failed, "
+                "files_approved = :approved, files_rejected = :rejected, "
+                "last_updated_at = :now, #ttl = :ttl, "
+                "started_at = if_not_exists(started_at, :now), "
+                "resume_invocations = if_not_exists(resume_invocations, :zero)"
+            ),
+            ExpressionAttributeNames={"#status": "status", "#ttl": "ttl"},
+            ExpressionAttributeValues={
+                ":repo_url": repo_url, ":goal": goal, ":status": status,
+                ":cost": Decimal(str(cost_used_usd)), ":total": len(file_statuses),
+                ":migrated": counts.get("migrated", 0) + counts.get("approved", 0),
+                ":failed": counts.get("failed", 0),
+                ":approved": counts.get("approved", 0),
+                ":rejected": counts.get("rejected", 0),
+                ":now": now, ":ttl": int(now) + _SUMMARY_TTL_SECONDS, ":zero": 0,
+            },
+        )
+
+    def note_resume(self, task_id: str) -> None:
+        """Bumps resume_invocations on the SUMMARY item -- one per ACTION=resume
+        call, i.e. one per Fargate-crash recovery attempt for this task."""
+        now = Decimal(str(time.time()))
+        self._table.update_item(
+            Key={"PK": f"TASK#{task_id}", "SK": "SUMMARY"},
+            UpdateExpression="ADD resume_invocations :one SET last_updated_at = :now, #ttl = :ttl",
+            ExpressionAttributeNames={"#ttl": "ttl"},
+            ExpressionAttributeValues={":one": 1, ":now": now, ":ttl": int(now) + _SUMMARY_TTL_SECONDS},
+        )

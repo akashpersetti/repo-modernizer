@@ -1,6 +1,6 @@
 resource "aws_cloudwatch_log_group" "api_lambda" {
   name              = "/aws/lambda/repomod-api"
-  retention_in_days = 7
+  retention_in_days = 30
 }
 
 resource "aws_lambda_function" "api" {
@@ -25,7 +25,7 @@ resource "aws_lambda_function" "api" {
 
 resource "aws_cloudwatch_log_group" "consumer_lambda" {
   name              = "/aws/lambda/repomod-consumer"
-  retention_in_days = 7
+  retention_in_days = 30
 }
 
 data "archive_file" "consumer" {

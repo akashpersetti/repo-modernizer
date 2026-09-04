@@ -5,6 +5,14 @@ locals {
   }
 }
 
+# Without this, Cost Explorer / the budget filter above silently returns $0 for
+# real spend -- user-defined tags must be activated as cost allocation tags in
+# Billing before CE will group or filter by them, and activation isn't retroactive.
+resource "aws_ce_cost_allocation_tag" "project" {
+  tag_key = "project"
+  status  = "Active"
+}
+
 resource "aws_budgets_budget" "alert" {
   name         = "repomodernizer-alert"
   budget_type  = "COST"
